@@ -10,16 +10,33 @@ from multiprocessing import Pool
 
 # Other Libraries
 import pyart
+import netCDF4
 import numpy as np
-import pandas as pd
+# import pandas as pd
 
 # Custom modules.
-import raijin_tools
+# import raijin_tools
 import radar_codes
 
 
 def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV'):
+    """
+    Basic filtering
 
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_name: str
+            Reflectivity field name.
+        rhohv_name: str
+            Cross correlation ratio field name.
+
+    Returns:
+    ========
+        gf_despeckeld: GateFilter
+            Gate filter (excluding all bad data).
+    """
     gf = pyart.filters.GateFilter(radar)
     gf.exclude_outside(refl_name, -20, 90)
     gf.exclude_below(RHOHV, 0.5)
@@ -29,7 +46,16 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV'):
     return gf_despeckeld
 
 
-def main():
+def production_line(radar_file_name):
+
+    try:
+        radar = pyart.io.read(radar_file_name)
+    except:
+        logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
+        return None
+
+    radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
+
     # Compute SNR
     height, temperature, snr = radar_codes.snr_and_sounding(radar, sound_dir, 'DBZ')
     radar.add_field('sounding_temperature', temperature, replace_existing = True)
@@ -61,7 +87,7 @@ def main():
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
 
     # Unfold PHIDP, refold VELOCITY
-    phidp_unfold, vdop_refolded = radar_codes.unfold_phidp_vdop(radar)
+    phidp_unfold, vdop_refolded = radar_codes.unfold_phidp_vdop(radar, unfold_vel=False)
     radar.add_field_like('PHIDP', 'PHIDP_CORR', rslt, replace_existing=True)
     if vdop_refolded is not None:
         radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
@@ -90,14 +116,21 @@ def main():
 
     # Liquid/Ice Mass
     liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
-    radar.add_field('LWM', liquid_water_mass)
-    radar.add_field('IWM', ice_mass)
+    radar.add_field('LWC', liquid_water_mass)
+    radar.add_field('IWC', ice_mass)
 
+    return None
+
+
+def main():
 
     return None
 
 
 if __name__ == '__main__':
+
+    INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
+    OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
 
     log_file_name =  os.path.join(os.path.expanduser('~'), 'cpol_level1b.log')
     logging.basicConfig(

@@ -20,7 +20,7 @@ from scipy.stats import linregress
 from scipy.ndimage.filters import convolve1d
 from scipy.integrate import cumtrapz
 
-from csu_radartools import csu_kdp
+from csu_radartools import csu_kdp, csu_liquid_ice_mass, csu_fhc
 
 
 def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
@@ -143,11 +143,12 @@ def refold_vdop(vdop_art, v_nyq_vel, rth_position):
 def unfold_phi(phidp, kdp):
     """Alternative phase unfolding which completely relies on Kdp.
     This unfolding should be used in oder to iteratively reconstruct
-    phidp and Kdp.
-    Parameters
-    ----------
-    phidp : array of floats
-    kdp : array of floats
+    phidp and Kdp. Function from wradlib.
+
+    Parameters:
+    ===========
+        phidp : array
+        kdp : array
     """
     # unfold phidp
     shape = phidp.shape
@@ -173,6 +174,25 @@ def unfold_phi(phidp, kdp):
 ###############################################################################
 
 def bringi_phidp_kdp(radar, refl_name='DBZ', phidp_name='PHIDP'):
+    """
+    Compute PHIDP and KDP using Bringi's algorithm.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure
+        refl_name: str
+            Reflectivity field name
+        phidp_name: str
+            PHIDP field name
+
+    Returns:
+    ========
+        fdN: array
+            PhiDP Bringi
+        kdN: array
+            KDP Bringi
+    """
 
     refl = radar.fields[refl_name]['data'].filled(fill_value = np.NaN)
     phidp = radar.fields[phidp_name]['data'].filled(fill_value = np.NaN)
@@ -190,7 +210,25 @@ def bringi_phidp_kdp(radar, refl_name='DBZ', phidp_name='PHIDP'):
 
 
 def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP'):
+    """
+    Correct attenuation on reflectivity.
 
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_name: str
+            Reflectivity field name.
+        kdp_name: str
+            KDP field name.
+
+    Returns:
+    ========
+        atten_meta: dict
+            Specific attenuation.
+        zh_corr: array
+            Attenuation corrected reflectivity.
+    """
     r = radar.range['data']
     refl = radar.fields[refl_name]['data']
     kdp = radar.fields[kdp_name]['data']
@@ -207,7 +245,25 @@ def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP'):
 
 
 def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP'):
+    """
+    Correct attenuation on differential reflectivity.
 
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        zdr_name: str
+            Differential reflectivity field name.
+        kdp_name: str
+            KDP field name.
+
+    Returns:
+    ========
+        atten_meta: dict
+            Specific attenuation.
+        zdr_corr: array
+            Attenuation corrected differential reflectivity.
+    """
     r = radar.range['data']
     zdr = radar.fields[zdr_name]['data']
     kdp = radar.fields[kdp_name]['data']
@@ -224,7 +280,24 @@ def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP'):
 
 
 def correct_rhohv(radar, rhohv_name='RHOHV', snr_name='SNR'):
+    """
+    Correct cross correlation ratio (RHOHV) from noise. From the Schuur et al.
+    2003 NOAA report (p7 eq 5)
 
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        rhohv_name: str
+            Cross correlation field name.
+        snr_name: str
+            Signal to noise ratio field name.
+
+    Returns:
+    ========
+        rho_corr: array
+            Corrected cross correlation ratio.
+    """
     rhohv = radar.fields[rhohv_name]['data']
     snr = radar.fields[snr_name]['data']
     natural_snr = 10**(0.1*snr)
@@ -234,7 +307,24 @@ def correct_rhohv(radar, rhohv_name='RHOHV', snr_name='SNR'):
 
 
 def correct_zdr(radar, zdr_name='ZDR_CORR', snr_name='SNR'):
+    """
+    Correct differential reflectivity (ZDR) from noise. From the Schuur et al.
+    2003 NOAA report (p7 eq 6)
 
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        zdr_name: str
+            Differential reflectivity field name.
+        snr_name: str
+            Signal to noise ratio field name.
+
+    Returns:
+    ========
+        corr_zdr: array
+            Corrected differential reflectivity.
+    """
     zdr = radar.fields[zdr_name]['data']
     snr = radar.fields[snr_name]['data']
     alpha = 1.48
@@ -246,7 +336,23 @@ def correct_zdr(radar, zdr_name='ZDR_CORR', snr_name='SNR'):
 
 
 def estimate_kdp(radar, gatefilter, phidp_name='PHIDP'):
+    """
+    Estimate KDP.
 
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        gatefilter:
+            Radar GateFilter (excluding bad data).
+        phidp_name: str
+            PHIDP field name.
+
+    Returns:
+    ========
+        kdp_field: dict
+            KDP.
+    """
     phidp = radar.fields[phidp_name]['data'].data
     r = radar.range['data']
 
@@ -264,7 +370,31 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                                kdp_name='KDP', rhohv_name='RHOHV',
                                temperature_name='sounding_temperature',
                                height_name='height'):
+    """
+    Compute hydrometeo classification.
 
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_name: str
+            Reflectivity field name.
+        zdr_name: str
+            ZDR field name.
+        kdp_name: str
+            KDP field name.
+        rhohv_name: str
+            RHOHV field name.
+        temperature_name: str
+            Sounding temperature field name.
+        height: str
+            Gate height field name.
+
+    Returns:
+    ========
+        hydro_meta: dict
+            Hydrometeor classification.
+    """
     refl = radar.fields['zcorr']['data']
     zdr = radar.fields['zdr_corr']['data']
     kdp = radar.fields['KDP']['data']
@@ -298,8 +428,10 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
 
     liquid_water_mass, ice_mass = csu_liquid_ice_mass.calc_liquid_ice_mass(refl, zdr, radar_z/1000, T=radar_T, method='cifelli')
 
-    liquid_water_mass = {'data': liquid_water_mass, 'units': 'g m-3', 'long_name': 'Liquid Water Mass', 'standard_name': 'liquid_water_content'}
-    ice_mass = {'data': ice_mass, 'units': 'g m-3', 'long_name': 'Ice Water Mass', 'standard_name': 'ice_water_content'}
+    liquid_water_mass = {'data': liquid_water_mass, 'units': 'g m-3', 'long_name': \
+                         'Liquid Water Content', 'standard_name': 'liquid_water_content'}
+    ice_mass = {'data': ice_mass, 'units': 'g m-3', 'long_name': 'Ice Water Content',
+                'standard_name': 'ice_water_content'}
 
     return liquid_water_mass, ice_mass
 
