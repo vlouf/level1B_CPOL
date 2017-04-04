@@ -50,6 +50,7 @@ def production_line(radar_file_name):
 
     try:
         radar = pyart.io.read(radar_file_name)
+        logger.info("Opening %s", radar_file_name)
     except:
         logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
         return None
@@ -61,13 +62,16 @@ def production_line(radar_file_name):
     radar.add_field('sounding_temperature', temperature, replace_existing = True)
     radar.add_field('height', height, replace_existing = True)
     radar.add_field('SNR', snr, replace_existing = True)
+    logger.info('SNR computed.')
 
     # Correct RHOHV
     rho_corr = radar_codes.correct_rhohv(radar)
     radar.add_field_like('RHOHV', 'RHOHV_CORR', rho_corr, replace_existing = True)
+    logger.info('RHOHV corrected.')
 
     # Get filter
     gatefilter = do_gatefilter(radar)
+    logger.info('Filter initialized.')
 
     # Correct ZDR
     corr_zdr = radar_codes.correct_zdr(radar)
@@ -80,16 +84,19 @@ def production_line(radar_file_name):
         logger.info('We need to estimate KDP')
         kdp_con = radar_codes.estimate_kdp(radar, gatefilter)
         radar.add_field('KDP', kdp_con, replace_existing=True)
+        logger.info('KDP estimated.')
 
     # Bringi PHIDP/KDP
     phidp_bringi, kdp_bringi = radar_codes.bringi_phidp_kdp()
     radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
+    logger.info('KDP/PHIDP Bringi estimated.')
 
     # Unfold PHIDP, refold VELOCITY
     phidp_unfold, vdop_refolded = radar_codes.unfold_phidp_vdop(radar, unfold_vel=False)
     radar.add_field_like('PHIDP', 'PHIDP_CORR', rslt, replace_existing=True)
     if vdop_refolded is not None:
+        logger.info('Doppler velocity needs to be refolded.')
         radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
         doppler_refold = True
 
@@ -99,25 +106,30 @@ def production_line(radar_file_name):
     else:
         vdop_unfold = radar_codes.unfold_velocity(radar, my_gatefilter, vel_name='VEL')
     radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing = True)
+    logger.info('Doppler velocity unfolded.')
 
     # Correct Attenuation ZH
     atten_spec, zh_corr = radar_codes.correct_attenuation_zh(radar)
     radar.add_field_like('DBZ', 'DBZ_CORR', zh_corr, replace_existing=True)
     radar.add_field('specific_attenuation_zh', atten_spec, replace_existing=True)
+    logger.info('Attenuation on reflectivity corrected.')
 
     # Correct Attenuation ZDR
     atten_spec_zdr, zdr_corr = radar_codes.correct_attenuation_zdr(radar)
     radar.add_field_like('ZDR', 'ZDR_CORR', zdr_corr, replace_existing=True)
     radar.add_field('specific_attenuation_zdr', atten_spec_zdr, replace_existing=True)
+    logger.info('Attenuation on ZDR corrected.')
 
     # Hydrometeors classification
     hydro_class = radar_codes.hydrometeor_classification(radar)
     radar.add_field('HYDRO', hydro_class, replace_existing=True)
+    logger.info('Hydrometeors classification estimated.')
 
     # Liquid/Ice Mass
     liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
     radar.add_field('LWC', liquid_water_mass)
     radar.add_field('IWC', ice_mass)
+    logger.info('Liquid/Ice mass estimated.')
 
     return None
 

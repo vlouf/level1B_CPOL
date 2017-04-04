@@ -11,7 +11,7 @@ from copy import deepcopy
 import pyart
 import netCDF4
 import numpy as np
-import skfuzzy as fuzz
+# import skfuzzy as fuzz
 
 from numba import jit, int32, float32
 
