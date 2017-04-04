@@ -51,14 +51,23 @@ def plot_figure_check(radar, gatefilter, outfilename):
         outfilename:
             Name given to the output netcdf data file.
     """
-    gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(3, 4, figsize=(24, 15), sharex=True, sharey=True)
-    the_ax = the_ax.flatten()
+    # Checking if figure already exists.
+    outfile = os.path.basename(outfilename)
+    outfile = outfile[:-2] + "png"
+    outfile = os.path.join(FIGURE_CHECK_PATH, outfile)
+    if os.path.isfile(outfile):
+        logger.error('Figure already exists')
+        return None
 
+    # Initializing figure.
+    gr = pyart.graph.RadarDisplay(radar)
+    fig, the_ax = pl.subplots(6, 2, figsize=(12, 30), sharex=True, sharey=True)
+    the_ax = the_ax.flatten()
+    # Plotting reflectivity
     gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
     gr.plot_ppi('DBZ_CORR', ax = the_ax[1], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSRef, vmin=-10, vmax=70)
 
-    gr.plot_ppi('ZDR', ax = the_ax[2], vmin=-5, vmax=10)
+    gr.plot_ppi('ZDR', ax = the_ax[2], vmin=-5, vmax=10)  # ZDR
     gr.plot_ppi('ZDR_CORR', ax = the_ax[3], gatefilter=gatefilter, vmin=-5, vmax=10)
 
     gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180)
@@ -75,15 +84,10 @@ def plot_figure_check(radar, gatefilter, outfilename):
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
-        # ax_sl.axis('square')
         ax_sl.axis((-150, 150, -150, 150))
 
     pl.tight_layout()
-
-    outfile = os.path.basename(outfilename)
-    outfile = outfile[:-2] + "png"
-    outfile = os.path.join(FIGURE_CHECK_PATH, outfile)
-    pl.savefig(outfile)
+    pl.savefig(outfile)  # Saving figure.
 
     return None
 
