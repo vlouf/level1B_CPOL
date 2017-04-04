@@ -1,53 +1,116 @@
+"""
+CPOL Level 1b main production line.
+
+@title: CPOL_PROD_1b
+@author: Valentin Louf <valentin.louf@monash.edu>
+@institution: Bureau of Meteorology
+@date: 04/04/2017
+@version: 0.5
+
+.. autosummary::
+    :toctree: generated/
+
+    plot_figure_check
+    production_line
+    main
+"""
 # Python Standard Library
 import os
-import sys
-import pickle
+import glob
+import time
 import logging
-import argparse
 import datetime
-import subprocess
+import warnings
 from multiprocessing import Pool
 
-# Other Libraries
+# Other Libraries -- Matplotlib must be called first
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.colors as colors
+import matplotlib.pyplot as pl
+
 import pyart
 import netCDF4
 import numpy as np
-# import pandas as pd
 
 # Custom modules.
 # import raijin_tools
 import radar_codes
 
 
-def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV'):
+def plot_figure_check(radar, gatefilter, outfilename):
     """
-    Basic filtering
+    Plot figure of old/new radar parameters for checking purpose.
 
     Parameters:
     ===========
         radar:
             Py-ART radar structure.
-        refl_name: str
-            Reflectivity field name.
-        rhohv_name: str
-            Cross correlation ratio field name.
-
-    Returns:
-    ========
-        gf_despeckeld: GateFilter
-            Gate filter (excluding all bad data).
+        gatefilter:
+            The Gate filter.
+        outfilename:
+            Name given to the output netcdf data file.
     """
-    gf = pyart.filters.GateFilter(radar)
-    gf.exclude_outside(refl_name, -20, 90)
-    gf.exclude_below(RHOHV, 0.5)
+    gr = pyart.graph.RadarDisplay(radar)
+    fig, the_ax = pl.subplots(3, 4, figsize=(24, 15), sharex=True, sharey=True)
+    the_ax = the_ax.flatten()
 
-    gf_despeckeld = pyart.correct.despeckle_field(radar, refl_name, gatefilter=gf)
+    gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
+    gr.plot_ppi('DBZ_CORR', ax = the_ax[1], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSRef, vmin=-10, vmax=70)
 
-    return gf_despeckeld
+    gr.plot_ppi('ZDR', ax = the_ax[2], vmin=-5, vmax=10)
+    gr.plot_ppi('ZDR_CORR', ax = the_ax[3], gatefilter=gatefilter, vmin=-5, vmax=10)
+
+    gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180)
+    gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180)
+
+    gr.plot_ppi('VEL', ax = the_ax[6], cmap=pyart.graph.cm.NWSVel, vmin=-15, vmax=15)
+    gr.plot_ppi('VEL_UNFOLDED', ax = the_ax[7], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-15, vmax=15)
+
+    gr.plot_ppi('SNR', ax = the_ax[8])
+    gr.plot_ppi('KDP', ax = the_ax[9], gatefilter=gatefilter, vmin=-1, vmax=1)
+
+    gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='YlOrRd', vmin=-10, vmax=30)
+    gr.plot_ppi('LWC', ax = the_ax[11], norm=colors.LogNorm(vmin=0.01, vmax=10), gatefilter=gatefilter, cmap='YlOrRd')
+
+    for ax_sl in the_ax:
+        gr.plot_range_rings([50, 100, 150], ax=ax_sl)
+        # ax_sl.axis('square')
+        ax_sl.axis((-150, 150, -150, 150))
+
+    pl.tight_layout()
+
+    outfile = os.path.basename(outfilename)
+    outfile = outfile[:-2] + "png"
+    outfile = os.path.join(FIGURE_CHECK_PATH, outfile)
+    pl.savefig(outfile)
+
+    return None
 
 
 def production_line(radar_file_name):
+    """
+    Production line for correcting and estimating CPOL data radar parameters.
+    The naming convention for these parameters is assumed to be DBZ, ZDR, VEL,
+    PHIDP, KDP, SNR, RHOHV, and NCP. KDP, NCP, and SNR are optional and can be
+    recalculated.
 
+    Parameters:
+    ===========
+        radar_file_name: str
+            Name of the input radar file.
+    """
+    # Create output file name and check if it already exists.
+    outfilename = os.path.basename(radar_file_name)
+    outfilename = outfilename.replace("level1a", "level1b")
+    outpath = os.path.expanduser('~')
+    outfilename = os.path.join(outpath, outfilename)
+    if os.path.isfile(outfilename):
+        logger.error('Output file already exists. Nothing done.')
+        print('Output file already exists. Nothing done.')
+        return None
+
+    # Read the input radar file.
     try:
         radar = pyart.io.read(radar_file_name)
         logger.info("Opening %s", radar_file_name)
@@ -55,14 +118,20 @@ def production_line(radar_file_name):
         logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
         return None
 
-    radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
+    # Get the date and start the chrono.
+    # radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
+    start_time = time.time()
 
     # Compute SNR
-    height, temperature, snr = radar_codes.snr_and_sounding(radar, sound_dir, 'DBZ')
+    height, temperature, snr = radar_codes.snr_and_sounding(radar, SOUND_DIR, 'DBZ')
     radar.add_field('sounding_temperature', temperature, replace_existing = True)
     radar.add_field('height', height, replace_existing = True)
-    radar.add_field('SNR', snr, replace_existing = True)
-    logger.info('SNR computed.')
+    try:
+        pyart.fields['SNR']
+        logger.info('SNR already exists.')
+    except KeyError:
+        radar.add_field('SNR', snr, replace_existing = True)
+        logger.info('SNR saved.')
 
     # Correct RHOHV
     rho_corr = radar_codes.correct_rhohv(radar)
@@ -70,7 +139,7 @@ def production_line(radar_file_name):
     logger.info('RHOHV corrected.')
 
     # Get filter
-    gatefilter = do_gatefilter(radar)
+    gatefilter = radar_codes.do_gatefilter(radar)
     logger.info('Filter initialized.')
 
     # Correct ZDR
@@ -80,6 +149,7 @@ def production_line(radar_file_name):
     # Estimate KDP
     try:
         radar.fields['KDP']
+        logger.info('KDP already exists')
     except KeyError:
         logger.info('We need to estimate KDP')
         kdp_con = radar_codes.estimate_kdp(radar, gatefilter)
@@ -87,14 +157,15 @@ def production_line(radar_file_name):
         logger.info('KDP estimated.')
 
     # Bringi PHIDP/KDP
-    phidp_bringi, kdp_bringi = radar_codes.bringi_phidp_kdp()
+    phidp_bringi, kdp_bringi = radar_codes.bringi_phidp_kdp(radar)
     radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
     logger.info('KDP/PHIDP Bringi estimated.')
 
     # Unfold PHIDP, refold VELOCITY
+    doppler_refold = False
     phidp_unfold, vdop_refolded = radar_codes.unfold_phidp_vdop(radar, unfold_vel=False)
-    radar.add_field_like('PHIDP', 'PHIDP_CORR', rslt, replace_existing=True)
+    radar.add_field_like('PHIDP', 'PHIDP_CORR', phidp_unfold, replace_existing=True)
     if vdop_refolded is not None:
         logger.info('Doppler velocity needs to be refolded.')
         radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
@@ -102,9 +173,9 @@ def production_line(radar_file_name):
 
     # Unfold VELOCITY
     if doppler_refold:
-        vdop_unfold = radar_codes.unfold_velocity(radar, my_gatefilter, vel_name='VEL_CORR')
+        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, vel_name='VEL_CORR')
     else:
-        vdop_unfold = radar_codes.unfold_velocity(radar, my_gatefilter, vel_name='VEL')
+        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, vel_name='VEL')
     radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing = True)
     logger.info('Doppler velocity unfolded.')
 
@@ -131,18 +202,36 @@ def production_line(radar_file_name):
     radar.add_field('IWC', ice_mass)
     logger.info('Liquid/Ice mass estimated.')
 
+    # Write results
+    pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
+    logger.info('%s saved', outfilename)
+
+    end_time = time.time()
+    logger.info("Treatment for %s done in %f seconds.", os.path.basename(outfilename), (end_time - start_time))
+
+    # Plotting checking figure.
+    plot_figure_check(radar, gatefilter, outfilename)
+    logger.info("Figure for %s plotted in %f seconds.", os.path.basename(outfilename), (time.time() - end_time))
+
     return None
 
 
 def main():
+    flist = glob.glob("../data/*.nc")
+    production_line(flist[0])
 
     return None
 
 
 if __name__ == '__main__':
+    """
+    Global variables definition and logging file initialisation.
+    """
 
     INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
     OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
+    SOUND_DIR = "/data/vlouf/data/soudings_netcdf/"
+    FIGURE_CHECK_PATH = os.path.expanduser('~')
 
     log_file_name =  os.path.join(os.path.expanduser('~'), 'cpol_level1b.log')
     logging.basicConfig(
@@ -152,4 +241,7 @@ if __name__ == '__main__':
         filemode='w')
     logger = logging.getLogger(__name__)
 
-    main()
+    with warnings.catch_warnings():
+        # Just ignoring warning messages.
+        warnings.simplefilter("ignore")
+        main()

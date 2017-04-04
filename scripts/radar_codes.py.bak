@@ -9,20 +9,20 @@ Codes for correcting and estimating various radar and meteorological parameters.
 .. autosummary::
     :toctree: generated/
 
-    bringi_phidp_kdp
     compute_attenuation
-    correct_attenuation_zdr
+    nearest
+    snr_and_sounding
+    kdp_from_phidp_finitediff
+    refold_vdop
+    unfold_phi
+    bringi_phidp_kdp
     correct_attenuation_zh
+    correct_attenuation_zdr
     correct_rhohv
     correct_zdr
     estimate_kdp
     hydrometeor_classification
-    kdp_from_phidp_finitediff
     liquid_ice_mass
-    nearest
-    refold_vdop
-    snr_and_sounding
-    unfold_phi
     unfold_phidp_vdop
     unfold_velocity
 """
@@ -49,6 +49,215 @@ from scipy.ndimage.filters import convolve1d
 from scipy.integrate import cumtrapz
 
 from csu_radartools import csu_kdp, csu_liquid_ice_mass, csu_fhc
+
+
+def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV'):
+    """
+    Basic filtering
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_name: str
+            Reflectivity field name.
+        rhohv_name: str
+            Cross correlation ratio field name.
+
+    Returns:
+    ========
+        gf_despeckeld: GateFilter
+            Gate filter (excluding all bad data).
+    """
+    gf = pyart.filters.GateFilter(radar)
+    gf.exclude_outside(refl_name, -20, 90)
+    gf.exclude_below(rhohv_name, 0.5)
+
+    gf_despeckeld = pyart.correct.despeckle_field(radar, refl_name, gatefilter=gf)
+
+    return gf_despeckeld
+
+
+def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
+    """
+    Alpha is defined by Ah=alpha*Kdp, beta is defined by Ah-Av=beta*Kdp.
+    From Bringi et al. (2003)
+
+    Parameters:
+    ===========
+        kdp: array
+            Specific phase.
+        alpha: float
+            Parameter being defined by Ah = alpha*Kdp
+        dr: float
+            Gate range in km.
+
+    Returns:
+    ========
+        atten_specific: array
+            Specfific attenuation (dB/km)
+        atten: array
+            Cumulated attenuation (dB)
+    """
+    # alpha = 0.08
+    # beta = 0.016
+    kdp[kdp < 0] = 0
+    atten_specific = alpha*kdp
+    atten_specific[np.isnan(atten_specific)] = 0
+    atten = 2 * np.cumsum(atten_specific, axis=1) * dr
+
+    return atten_specific, atten
+
+
+def nearest(items, pivot):
+    """
+    Find the nearest item.
+
+    Parameters:
+    ===========
+        items:
+            List of item.
+        pivot:
+            Item we're looking for.
+
+    Returns:
+    ========
+        item:
+            Value of the nearest item found.
+    """
+    return min(items, key=lambda x: abs(x - pivot))
+
+
+def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
+    """
+    snr_and_sounding
+    TODO: Find Nearest date !!!!
+    """
+
+    if soundings_dir is None:
+        soundings_dir = "/g/data2/rr5/vhl548/soudings_netcdf/"
+
+    radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
+    sonde_pattern = datetime.datetime.strftime(radar_start_date, 'YPDN_%Y%m%d*')
+
+    all_sonde_files = os.listdir(soundings_dir)
+    sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
+
+    interp_sonde = netCDF4.Dataset(os.path.join(soundings_dir, sonde_name))
+    temperatures = interp_sonde.variables['temp'][:]
+    times = interp_sonde.variables['time'][:]
+    heights = interp_sonde.variables['height'][:]
+
+    my_profile = pyart.retrieve.fetch_radar_time_profile(interp_sonde, radar)
+    z_dict, temp_dict = pyart.retrieve.map_profile_to_gates(temperatures, my_profile['height'], radar)
+    temp_info_dict = {'data': temp_dict['data'],
+                 'long_name': 'Sounding temperature at gate',
+                 'standard_name' : 'temperature',
+                 'valid_min' : -100,
+                 'valid_max' : 100,
+                 'units' : 'degrees Celsius'}
+    snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name)
+
+    return z_dict, temp_info_dict, snr
+
+
+def kdp_from_phidp_finitediff(phidp, L=7, dr=1.):
+    """
+    Retrieves KDP from PHIDP by applying a moving window range finite
+    difference derivative. Function from wradlib.
+
+    Parameters
+    ----------
+    phidp : multi-dimensional array
+        Note that the range dimension must be the last dimension of
+        the input array.
+    L : integer
+        Width of the window (as number of range gates)
+    dr : gate length in km
+    """
+
+    assert (L % 2) == 1, \
+        "Window size N for function kdp_from_phidp must be an odd number."
+    # Make really sure L is an integer
+    L = int(L)
+    kdp = np.zeros(phidp.shape)
+    for r in range(int(L / 2), phidp.shape[-1] - int(L / 2)):
+        kdp[..., r] = (phidp[..., r + int(L / 2)] -
+                       phidp[..., r - int(L / 2)]) / (L - 1)
+    return kdp / 2. / dr
+
+
+@jit(cache=True)
+def refold_vdop(vdop_art, v_nyq_vel, rth_position):
+    """
+    Refold Doppler velocity from PHIDP folding position.
+
+    Parameters:
+    ===========
+        vdop_art: array
+            Doppler velocity
+        v_nyq_vel: float
+            Nyquist velocity.
+        rth_position: list
+            Folding position of PHIDP along axis 2 (length of rth_position is
+            length of axis 1).
+
+    Returns:
+    ========
+        new_vdop: array
+            Properly folded doppler velocity.
+    """
+    new_vdop = vdop_art
+    for j in range(len(rth_position)):
+        i = rth_position[j]
+        if i == 0:
+            continue
+        else:
+            new_vdop[j, i:] += v_nyq_vel
+
+    pos = (vdop_art > v_nyq_vel)
+    new_vdop[pos] = new_vdop[pos] - 2*v_nyq_vel
+
+    return new_vdop
+
+
+def unfold_phi(phidp, kdp):
+    """
+    Alternative phase unfolding which completely relies on Kdp.
+    This unfolding should be used in oder to iteratively reconstruct
+    phidp and Kdp. Function from wradlib.
+
+    Parameters:
+    ===========
+        phidp : array
+        kdp : array
+
+    Returns:
+    ========
+        phidp: array
+        rth_pos: list
+            Position of folding along axis 1.
+    """
+    # unfold phidp
+    shape = phidp.shape
+    phidp = phidp.reshape((-1, shape[-1]))
+    kdp = kdp.reshape((-1, shape[-1]))
+
+    rth_pos = np.zeros((phidp.shape[0]), dtype=np.int32)
+
+    for beam in range(phidp.shape[0]):
+        below_th3 = kdp[beam] < -20
+        try:
+            idx1 = np.where(below_th3)[0][2]
+            phidp[beam, idx1:] += 360
+            rth_pos[beam] = idx1
+        except Exception:
+            pass
+
+    if len(rth_pos[rth_pos != 0]) == 0:
+        rth_pos = None
+
+    return phidp.reshape(shape), rth_pos
 
 
 def bringi_phidp_kdp(radar, refl_name='DBZ', phidp_name='PHIDP'):
@@ -87,33 +296,39 @@ def bringi_phidp_kdp(radar, refl_name='DBZ', phidp_name='PHIDP'):
     return fdN, kdN
 
 
-def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
+def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP'):
     """
-    Alpha is defined by Ah=alpha*Kdp, beta is defined by Ah-Av=beta*Kdp.
-    From Bringi et al. (2003)
+    Correct attenuation on reflectivity.
 
     Parameters:
     ===========
-        kdp: array
-            Specific phase.
-        alpha: float
-            Parameter being defined by Ah = alpha*Kdp
-        dr: float
-            Gate range in km.
+        radar:
+            Py-ART radar structure.
+        refl_name: str
+            Reflectivity field name.
+        kdp_name: str
+            KDP field name.
 
     Returns:
     ========
-        atten_specific: array
-            Specfific attenuation (dB/km)
-        atten: array
-            Cumulated attenuation (dB)
+        atten_meta: dict
+            Specific attenuation.
+        zh_corr: array
+            Attenuation corrected reflectivity.
     """
-    kdp[kdp < 0] = 0
-    atten_specific = alpha*kdp
-    atten_specific[np.isnan(atten_specific)] = 0
-    atten = 2 * np.cumsum(atten_specific, axis=1) * dr
+    r = radar.range['data']
+    refl = radar.fields[refl_name]['data']
+    kdp = radar.fields[kdp_name]['data']
 
-    return atten_specific, atten
+    dr = (r[1] - r[0]) / 1000  # km
+
+    atten_spec, atten = compute_attenuation(kdp, alpha=0.08, dr=dr)
+    zh_corr = refl + atten
+
+    atten_meta = {'data': atten_spec, 'units': 'dB/km', 'standard_name': 'specific_attenuation_zh',
+                  'long_name': 'Reflectivity specific attenuation'}
+
+    return atten_meta, zh_corr
 
 
 def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP'):
@@ -149,41 +364,6 @@ def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP'):
                   'long_name': 'Differential reflectivity specific attenuation'}
 
     return atten_meta, zdr_corr
-
-
-def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP'):
-    """
-    Correct attenuation on reflectivity.
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        refl_name: str
-            Reflectivity field name.
-        kdp_name: str
-            KDP field name.
-
-    Returns:
-    ========
-        atten_meta: dict
-            Specific attenuation.
-        zh_corr: array
-            Attenuation corrected reflectivity.
-    """
-    r = radar.range['data']
-    refl = radar.fields[refl_name]['data']
-    kdp = radar.fields[kdp_name]['data']
-
-    dr = (r[1] - r[0]) / 1000  # km
-
-    atten_spec, atten = compute_attenuation(kdp, alpha=0.08, dr=dr)
-    zh_corr = refl + atten
-
-    atten_meta = {'data': atten_spec, 'units': 'dB/km', 'standard_name': 'specific_attenuation_zh',
-                  'long_name': 'Reflectivity specific attenuation'}
-
-    return atten_meta, zh_corr
 
 
 def correct_rhohv(radar, rhohv_name='RHOHV', snr_name='SNR'):
@@ -240,33 +420,6 @@ def correct_zdr(radar, zdr_name='ZDR', snr_name='SNR'):
     corr_zdr = 10*np.log10((alpha*natural_snr*natural_zdr) / (alpha*natural_snr + alpha - natural_zdr))
 
     return corr_zdr
-
-
-def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV'):
-    """
-    Basic filtering
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        refl_name: str
-            Reflectivity field name.
-        rhohv_name: str
-            Cross correlation ratio field name.
-
-    Returns:
-    ========
-        gf_despeckeld: GateFilter
-            Gate filter (excluding all bad data).
-    """
-    gf = pyart.filters.GateFilter(radar)
-    gf.exclude_outside(refl_name, -20, 90)
-    gf.exclude_below(rhohv_name, 0.5)
-
-    gf_despeckeld = pyart.correct.despeckle_field(radar, refl_name, gatefilter=gf)
-
-    return gf_despeckeld
 
 
 def estimate_kdp(radar, gatefilter, phidp_name='PHIDP'):
@@ -352,33 +505,6 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     return hydro_meta
 
 
-def kdp_from_phidp_finitediff(phidp, L=7, dr=1.):
-    """
-    Retrieves KDP from PHIDP by applying a moving window range finite
-    difference derivative. Function from wradlib.
-
-    Parameters
-    ----------
-    phidp : multi-dimensional array
-        Note that the range dimension must be the last dimension of
-        the input array.
-    L : integer
-        Width of the window (as number of range gates)
-    dr : gate length in km
-    """
-
-    assert (L % 2) == 1, \
-        "Window size N for function kdp_from_phidp must be an odd number."
-    # Make really sure L is an integer
-    L = int(L)
-    kdp = np.zeros(phidp.shape)
-    for r in range(int(L / 2), phidp.shape[-1] - int(L / 2)):
-        kdp[..., r] = (phidp[..., r + int(L / 2)] -
-                       phidp[..., r - int(L / 2)]) / (L - 1)
-    return kdp / 2. / dr
-
-
-@jit(cache=True)
 def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                     temperature_name='sounding_temperature', height_name='height'):
     """
@@ -417,130 +543,6 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                 'standard_name': 'ice_water_content'}
 
     return liquid_water_mass, ice_mass
-
-
-def nearest(items, pivot):
-    """
-    Find the nearest item.
-
-    Parameters:
-    ===========
-        items:
-            List of item.
-        pivot:
-            Item we're looking for.
-
-    Returns:
-    ========
-        item:
-            Value of the nearest item found.
-    """
-    return min(items, key=lambda x: abs(x - pivot))
-
-
-def refold_vdop(vdop_art, v_nyq_vel, rth_position):
-    """
-    Refold Doppler velocity from PHIDP folding position.
-
-    Parameters:
-    ===========
-        vdop_art: array
-            Doppler velocity
-        v_nyq_vel: float
-            Nyquist velocity.
-        rth_position: list
-            Folding position of PHIDP along axis 2 (length of rth_position is
-            length of axis 1).
-
-    Returns:
-    ========
-        new_vdop: array
-            Properly folded doppler velocity.
-    """
-    new_vdop = vdop_art
-    for j in range(len(rth_position)):
-        i = rth_position[j]
-        if i == 0:
-            continue
-        else:
-            new_vdop[j, i:] += v_nyq_vel
-
-    pos = (vdop_art > v_nyq_vel)
-    new_vdop[pos] = new_vdop[pos] - 2*v_nyq_vel
-
-    return new_vdop
-
-
-def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
-    """
-    snr_and_sounding
-    TODO: Find Nearest date !!!!
-    """
-
-    if soundings_dir is None:
-        soundings_dir = "/g/data2/rr5/vhl548/soudings_netcdf/"
-
-    radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
-    sonde_pattern = datetime.datetime.strftime(radar_start_date, 'YPDN_%Y%m%d*')
-
-    all_sonde_files = os.listdir(soundings_dir)
-    sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
-
-    interp_sonde = netCDF4.Dataset(os.path.join(soundings_dir, sonde_name))
-    temperatures = interp_sonde.variables['temp'][:]
-    times = interp_sonde.variables['time'][:]
-    heights = interp_sonde.variables['height'][:]
-
-    my_profile = pyart.retrieve.fetch_radar_time_profile(interp_sonde, radar)
-    z_dict, temp_dict = pyart.retrieve.map_profile_to_gates(temperatures, my_profile['height'], radar)
-    temp_info_dict = {'data': temp_dict['data'],
-                 'long_name': 'Sounding temperature at gate',
-                 'standard_name' : 'temperature',
-                 'valid_min' : -100,
-                 'valid_max' : 100,
-                 'units' : 'degrees Celsius'}
-    snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name)
-
-    return z_dict, temp_info_dict, snr
-
-
-def unfold_phi(phidp, kdp):
-    """
-    Alternative phase unfolding which completely relies on Kdp.
-    This unfolding should be used in oder to iteratively reconstruct
-    phidp and Kdp. Function from wradlib.
-
-    Parameters:
-    ===========
-        phidp : array
-        kdp : array
-
-    Returns:
-    ========
-        phidp: array
-        rth_pos: list
-            Position of folding along axis 1.
-    """
-    # unfold phidp
-    shape = phidp.shape
-    phidp = phidp.reshape((-1, shape[-1]))
-    kdp = kdp.reshape((-1, shape[-1]))
-
-    rth_pos = np.zeros((phidp.shape[0]), dtype=np.int32)
-
-    for beam in range(phidp.shape[0]):
-        below_th3 = kdp[beam] < -20
-        try:
-            idx1 = np.where(below_th3)[0][2]
-            phidp[beam, idx1:] += 360
-            rth_pos[beam] = idx1
-        except Exception:
-            pass
-
-    if len(rth_pos[rth_pos != 0]) == 0:
-        rth_pos = None
-
-    return phidp.reshape(shape), rth_pos
 
 
 def unfold_phidp_vdop(radar, phidp_name='PHIDP', kdp_name='KDP', vel_name='VEL', unfold_vel=False):
