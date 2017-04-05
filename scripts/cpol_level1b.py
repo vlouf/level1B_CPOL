@@ -169,6 +169,8 @@ def production_line(radar_file_name):
     phidp_bringi, kdp_bringi = radar_codes.bringi_phidp_kdp(radar)
     radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
+    radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_" + radar.fields['PHIDP_BRINGI']['long_name']
+    radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
     logger.info('KDP/PHIDP Bringi estimated.')
 
     # Unfold PHIDP, refold VELOCITY
@@ -235,7 +237,8 @@ def production_line(radar_file_name):
 
     # Hardcode mask
     for mykey in radar.fields:
-        if mykey == 'sounding_temperature' or mykey == 'height':
+        if (mykey == 'sounding_temperature' or mykey == 'height' or
+            mykey == 'SNR' or mykey == 'NCP' or mykey == 'HYDRO'):
             continue
         else:
             radar.fields[mykey]['data'] = radar_codes.filter_hardcoding(radar.fields[mykey]['data'], gatefilter)

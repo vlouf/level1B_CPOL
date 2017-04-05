@@ -325,7 +325,7 @@ def filter_hardcoding(my_array, nuke_filter, bad=-9999):
     to_return = np.ma.masked_where(filt_array == bad, filt_array)
     return to_return
 
-    
+
 def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                                kdp_name='KDP', rhohv_name='RHOHV_CORR',
                                temperature_name='sounding_temperature',
@@ -499,18 +499,50 @@ def refold_vdop(vdop_art, v_nyq_vel, rth_position):
 
 def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     """
-    snr_and_sounding
-    TODO: Find Nearest date !!!!
+    Compute the signal-to-noise ratio as well as interpolating the radiosounding
+    temperature on to the radar grid. The function looks for the radiosoundings
+    that happened at the closest time from the radar. There is no time
+    difference limit.
+
+    Parameters:
+    ===========
+        radar:
+        soundings_dir: str
+            Path to the radiosoundings directory.
+        refl_field_name: str
+            Name of the reflectivity field.
+
+    Returns:
+    ========
+        z_dict: dict
+            Altitude in m, interpolated at each radar gates.
+        temp_info_dict: dict
+            Temperature in Celsius, interpolated at each radar gates.            
+        snr: dict
+            Signal to noise ratio.
     """
 
     if soundings_dir is None:
         soundings_dir = "/g/data2/rr5/vhl548/soudings_netcdf/"
 
+    # Getting radar date.
     radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
-    sonde_pattern = datetime.datetime.strftime(radar_start_date, 'YPDN_%Y%m%d*')
 
-    all_sonde_files = os.listdir(soundings_dir)
-    sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
+    # Listing radiosounding files.
+    sonde_pattern = datetime.datetime.strftime(radar_start_date, 'YPDN_%Y%m%d*')
+    all_sonde_files = sorted(os.listdir(soundings_dir))
+
+    try:
+        # The radiosoundings for the exact date exists.
+        sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
+    except IndexError:
+        # The radiosoundings for the exact date does not exist, looking for the
+        # closest date.
+        dtime = [datetime.datetime.strptime(dt, 'YPDN_%Y%m%d_%H.nc') for dt in all_sonde_files]
+        closest_date = nearest(dtime, radar_start_date)
+        sonde_pattern = datetime.datetime.strftime(closest_date, 'YPDN_%Y%m%d*')
+        radar_start_date = closest_date
+        sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
 
     interp_sonde = netCDF4.Dataset(os.path.join(soundings_dir, sonde_name))
     temperatures = interp_sonde.variables['temp'][:]
@@ -524,7 +556,8 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
                  'standard_name' : 'temperature',
                  'valid_min' : -100,
                  'valid_max' : 100,
-                 'units' : 'degrees Celsius'}
+                 'units' : 'degrees Celsius',
+                 'comment': 'Radiosounding date: %s' % (radar_start_date.strftime("%Y/%m/%d"))}
     snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name)
 
     return z_dict, temp_info_dict, snr
