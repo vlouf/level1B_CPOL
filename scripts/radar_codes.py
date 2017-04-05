@@ -614,6 +614,6 @@ def unfold_velocity(radar, my_gatefilter, vel_name=None):
         v_nyq_vel = np.max(np.abs(vdop_art))
 
     vdop_vel = pyart.correct.dealias_region_based(radar, vel_field=vel_name, gatefilter=my_gatefilter, nyquist_vel=v_nyq_vel)
-    vdop_vel['standard_name'] = radar.fields[vel_name]['standard_name']
+    # vdop_vel['standard_name'] = radar.fields[vel_name]['standard_name']
 
     return vdop_vel

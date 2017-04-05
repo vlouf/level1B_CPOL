@@ -92,6 +92,13 @@ def plot_figure_check(radar, gatefilter, outfilename):
     return None
 
 
+def filter_hardcoding(my_array, nuke_filter, bad=-9999):
+    filt_array = np.ma.masked_where(nuke_filter.gate_excluded, my_array.filled(fill_value=bad))
+    to_return = np.ma.masked_where(nuke_filter.gate_excluded, filt_array.filled(fill_value=bad))
+    to_return.set_fill_value(-9999)
+    return to_return
+
+
 def production_line(radar_file_name):
     """
     Production line for correcting and estimating CPOL data radar parameters.
@@ -220,15 +227,26 @@ def production_line(radar_file_name):
     figure_time = time.time()
     logger.info("Figure for %s plotted in %f seconds.", os.path.basename(outfilename), (figure_time - end_time))
 
-    # Remove unnecessary fields
+    # Rename fields and remove unnecessary ones.
     radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
     radar.add_field('RHOHV', radar.fields.pop('RHOHV_CORR'), replace_existing=True)
     radar.add_field('ZDR', radar.fields.pop('ZDR_CORR'), replace_existing=True)
     radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
     try:
         radar.fields['VEL_CORR']
-    except KeyError:
         radar.add_field('VEL', radar.fields.pop('VEL_CORR'), replace_existing=True)
+    except KeyError:
+        pass
+    radar.add_field('VEL_RAW', radar.fields.pop('VEL'), replace_existing=True)
+    radar.add_field('VEL', radar.fields.pop('VEL_UNFOLDED'), replace_existing=True)
+
+    # Hardcode mask
+    for mykey in radar.fields:
+        if mykey == 'sounding_temperature' or mykey == 'height':
+            continue
+        else:
+            radar.fields[mykey]['data'] = filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
+            logger.info('Hardcoding gatefilter for %s.', mykey)
 
     # Write results
     logger.info('Saving data')
@@ -254,6 +272,7 @@ if __name__ == '__main__':
     OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
     SOUND_DIR = "/data/vlouf/data/soudings_netcdf/"
     FIGURE_CHECK_PATH = os.path.expanduser('~')
+    NCPU = 16
 
     log_file_name =  os.path.join(os.path.expanduser('~'), 'cpol_level1b.log')
     logging.basicConfig(
