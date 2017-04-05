@@ -92,13 +92,6 @@ def plot_figure_check(radar, gatefilter, outfilename):
     return None
 
 
-def filter_hardcoding(my_array, nuke_filter, bad=-9999):
-    filt_array = np.ma.masked_where(nuke_filter.gate_excluded, my_array.filled(fill_value=bad))
-    to_return = np.ma.masked_where(nuke_filter.gate_excluded, filt_array.filled(fill_value=bad))
-    to_return.set_fill_value(-9999)
-    return to_return
-
-
 def production_line(radar_file_name):
     """
     Production line for correcting and estimating CPOL data radar parameters.
@@ -245,7 +238,7 @@ def production_line(radar_file_name):
         if mykey == 'sounding_temperature' or mykey == 'height':
             continue
         else:
-            radar.fields[mykey]['data'] = filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
+            radar.fields[mykey]['data'] = radar_codes.filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
             logger.info('Hardcoding gatefilter for %s.', mykey)
 
     # Write results

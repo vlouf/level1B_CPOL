@@ -300,6 +300,32 @@ def estimate_kdp(radar, gatefilter, phidp_name='PHIDP'):
     return kdp_field
 
 
+def filter_hardcoding(my_array, nuke_filter, bad=-9999):
+    """
+    Harcoding GateFilter into an array.
+
+    Parameters:
+    ===========
+        my_array: array
+            Array we want to clean out.
+        nuke_filter: gatefilter
+            Filter we want to apply to the data.
+        bad: float
+            Fill value.
+
+    Returns:
+    ========
+        to_return: masked array
+            Same as my_array but with all data corresponding to a gate filter
+            excluded.
+    """
+    filt_array = np.ma.masked_where(nuke_filter.gate_excluded, my_array)
+    filt_array.set_fill_value(bad)
+    filt_array = filt_array.filled(fill_value=bad)
+    to_return = np.ma.masked_where(filt_array == bad, filt_array)
+    return to_return
+
+    
 def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                                kdp_name='KDP', rhohv_name='RHOHV_CORR',
                                temperature_name='sounding_temperature',
