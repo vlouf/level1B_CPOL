@@ -16,9 +16,11 @@ CPOL Level 1b main production line.
 """
 # Python Standard Library
 import os
+import sys
 import glob
 import time
 import logging
+import argparse
 import datetime
 import warnings
 from multiprocessing import Pool
@@ -263,12 +265,52 @@ if __name__ == '__main__':
     """
     Global variables definition and logging file initialisation.
     """
+    welcome_msg = "Leveling treatment of CPOL data from level 1a to level 1b."
+
+    parser = argparse.ArgumentParser(description=welcome_msg)
+    parser.add_argument(
+        '-j',
+        '--cpu',
+        dest='ncpu',
+        default=16,
+        type=int,
+        help='Number of process')
+
+    parser.add_argument(
+        '-s',
+        '--start-date',
+        dest='start_date',
+        default=None,
+        type=str,
+        help='Starting date.')
+
+    parser.add_argument(
+        '-e',
+        '--end-date',
+        dest='end_date',
+        default=None,
+        type=str,
+        help='Ending date.')
+
+    args = parser.parse_args()
+    NCPU = args.ncpu
+    START_DATE = args.start_date
+    END_DATE = args.end_date
 
     INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
     OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
     SOUND_DIR = "/data/vlouf/data/soudings_netcdf/"
     FIGURE_CHECK_PATH = os.path.expanduser('~')
-    NCPU = 16
+
+    if not (START_DATE and END_DATE):
+        parser.error("Starting and ending date required.")
+
+    try:
+        datetime.datetime.strptime(START_DATE, "%Y%m%d")
+        datetime.datetime.strptime(END_DATE, "%Y%m%d")
+    except:
+        print("Did not understand the date format. Must be YYYYMMDD.")
+        sys.exit()
 
     log_file_name =  os.path.join(os.path.expanduser('~'), 'cpol_level1b.log')
     logging.basicConfig(
