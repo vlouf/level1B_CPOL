@@ -128,7 +128,7 @@ def production_line(radar_file_name):
         refold_velocity = True
     else:
         refold_velocity = False
-        
+
     start_time = time.time()
 
     # Compute SNR
@@ -171,12 +171,12 @@ def production_line(radar_file_name):
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
     logger.info('KDP/PHIDP Bringi estimated.')
 
-    # Unfold PHIDP, refold VELOCITY    
+    # Unfold PHIDP, refold VELOCITY
     phidp_unfold, vdop_refolded = radar_codes.unfold_phidp_vdop(radar, unfold_vel=refold_velocity)
     radar.add_field_like('PHIDP', 'PHIDP_CORR', phidp_unfold, replace_existing=True)
     if vdop_refolded is not None:
         logger.info('Doppler velocity needs to be refolded.')
-        radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)        
+        radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
 
     # Unfold VELOCITY
     try:
@@ -210,18 +210,30 @@ def production_line(radar_file_name):
     radar.add_field('IWC', ice_mass)
     logger.info('Liquid/Ice mass estimated.')
 
-    # Write results
-    logger.info('Saving data')
-    pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
-    logger.info('%s saved', outfilename)
-
+    # Treatment is finished!
     end_time = time.time()
     logger.info("Treatment for %s done in %f seconds.", os.path.basename(outfilename), (end_time - start_time))
 
     # Plot check figure.
     logger.info('Plotting figure')
     plot_figure_check(radar, gatefilter, outfilename)
-    logger.info("Figure for %s plotted in %f seconds.", os.path.basename(outfilename), (time.time() - end_time))
+    figure_time = time.time()
+    logger.info("Figure for %s plotted in %f seconds.", os.path.basename(outfilename), (figure_time - end_time))
+
+    # Remove unnecessary fields
+    radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
+    radar.add_field('RHOHV', radar.fields.pop('RHOHV_CORR'), replace_existing=True)
+    radar.add_field('ZDR', radar.fields.pop('ZDR_CORR'), replace_existing=True)
+    radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
+    try:
+        radar.fields['VEL_CORR']
+    except KeyError:
+        radar.add_field('VEL', radar.fields.pop('VEL_CORR'), replace_existing=True)
+
+    # Write results
+    logger.info('Saving data')
+    pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
+    logger.info('Saving %s took %f seconds.', os.path.basename(outfilename), (time.time() - figure_time))
 
     return None
 
