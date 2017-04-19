@@ -50,6 +50,9 @@ from scipy.integrate import cumtrapz
 
 from csu_radartools import csu_kdp, csu_liquid_ice_mass, csu_fhc
 
+# Personal import
+import phidp_codes
+
 
 def bringi_phidp_kdp(radar, refl_name='DBZ', phidp_name='PHIDP'):
     """
@@ -242,7 +245,7 @@ def correct_zdr(radar, zdr_name='ZDR', snr_name='SNR'):
     return corr_zdr
 
 
-def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV'):
+def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV', ncp_name='NCP'):
     """
     Basic filtering
 
@@ -263,6 +266,13 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV'):
     gf = pyart.filters.GateFilter(radar)
     gf.exclude_outside(refl_name, -20, 90)
     gf.exclude_below(rhohv_name, 0.5)
+
+    try:
+        # NCP field is not present for older seasons.
+        radar.fields[ncp_name]
+        gf.exclude_below(ncp_name, 0.5)
+    except KeyError:
+        pass
 
     gf_despeckeld = pyart.correct.despeckle_field(radar, refl_name, gatefilter=gf)
 
@@ -517,7 +527,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         z_dict: dict
             Altitude in m, interpolated at each radar gates.
         temp_info_dict: dict
-            Temperature in Celsius, interpolated at each radar gates.            
+            Temperature in Celsius, interpolated at each radar gates.
         snr: dict
             Signal to noise ratio.
     """
@@ -628,6 +638,7 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', kdp_name='KDP', vel_name='VEL',
     """
     fdN = radar.fields[phidp_name]['data']
     kdN = radar.fields[kdp_name]['data']
+    rhohv = radar.fields['RHOHV_CORR']['data']
     vdop_art = radar.fields[vel_name]['data']
 
     try:
@@ -635,7 +646,21 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', kdp_name='KDP', vel_name='VEL',
     except:
         v_nyq_vel = np.max(np.abs(vdop_art))
 
-    phidp_unfold, pos_unfold = unfold_phi(fdN, kdN)
+    phidp = deepcopy(fdN)
+    phidp = np.ma.masked_where(rhohv < 0.5, phidp).filled(fill_value=np.NaN)
+    smooth_phidp = phidp_codes.smooth_data_unfolding(phidp)
+    smooth_phidp = np.ma.masked_where((rhohv < 0.5) | np.isnan(phidp), smooth_phidp)
+
+    pos_unfold = phidp_codes.get_fold_position(smooth_phidp)
+    new_phidp_unfold = phidp_codes.unfold_phidp(phidp, pos_unfold)
+
+    phidp_unfold_smooth = phidp_codes.smooth_data_unfolding(new_phidp_unfold)
+
+    red_phi = phidp_codes.redress_data(phidp_unfold_smooth, 90)
+    phidp_unfold = np.ma.masked_where((rhohv < 0.5) | np.isnan(phidp) | np.isnan(red_phi), red_phi)
+
+    if len(pos_unfold[pos_unfold != 0]) == 0:
+        pos_unfold = None
 
     vdop_refolded = None
     if unfold_vel:

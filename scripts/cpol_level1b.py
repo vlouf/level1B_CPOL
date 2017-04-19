@@ -63,7 +63,7 @@ def plot_figure_check(radar, gatefilter, outfilename):
 
     # Initializing figure.
     gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(6, 2, figsize=(12, 30), sharex=True, sharey=True)
+    fig, the_ax = pl.subplots(5, 2, figsize=(10, 25), sharex=True, sharey=True)
     the_ax = the_ax.flatten()
     # Plotting reflectivity
     gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
@@ -72,8 +72,8 @@ def plot_figure_check(radar, gatefilter, outfilename):
     gr.plot_ppi('ZDR', ax = the_ax[2], vmin=-5, vmax=10)  # ZDR
     gr.plot_ppi('ZDR_CORR', ax = the_ax[3], gatefilter=gatefilter, vmin=-5, vmax=10)
 
-    gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180)
-    gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180)
+    gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180, cmap='jet')
+    gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='jet')
 
     gr.plot_ppi('VEL', ax = the_ax[6], cmap=pyart.graph.cm.NWSVel, vmin=-15, vmax=15)
     gr.plot_ppi('VEL_UNFOLDED', ax = the_ax[7], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-15, vmax=15)
@@ -81,8 +81,8 @@ def plot_figure_check(radar, gatefilter, outfilename):
     gr.plot_ppi('SNR', ax = the_ax[8])
     gr.plot_ppi('KDP', ax = the_ax[9], gatefilter=gatefilter, vmin=-1, vmax=1)
 
-    gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='YlOrRd', vmin=-10, vmax=30)
-    gr.plot_ppi('LWC', ax = the_ax[11], norm=colors.LogNorm(vmin=0.01, vmax=10), gatefilter=gatefilter, cmap='YlOrRd')
+    # gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='YlOrRd', vmin=-10, vmax=30)
+    # gr.plot_ppi('LWC', ax = the_ax[11], norm=colors.LogNorm(vmin=0.01, vmax=10), gatefilter=gatefilter, cmap='YlOrRd')
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
@@ -209,10 +209,10 @@ def production_line(radar_file_name):
     logger.info('Hydrometeors classification estimated.')
 
     # Liquid/Ice Mass
-    liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
-    radar.add_field('LWC', liquid_water_mass)
-    radar.add_field('IWC', ice_mass)
-    logger.info('Liquid/Ice mass estimated.')
+    # liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
+    # radar.add_field('LWC', liquid_water_mass)
+    # radar.add_field('IWC', ice_mass)
+    # logger.info('Liquid/Ice mass estimated.')
 
     # Treatment is finished!
     end_time = time.time()
@@ -265,52 +265,54 @@ if __name__ == '__main__':
     """
     Global variables definition and logging file initialisation.
     """
-    welcome_msg = "Leveling treatment of CPOL data from level 1a to level 1b."
-
-    parser = argparse.ArgumentParser(description=welcome_msg)
-    parser.add_argument(
-        '-j',
-        '--cpu',
-        dest='ncpu',
-        default=16,
-        type=int,
-        help='Number of process')
-
-    parser.add_argument(
-        '-s',
-        '--start-date',
-        dest='start_date',
-        default=None,
-        type=str,
-        help='Starting date.')
-
-    parser.add_argument(
-        '-e',
-        '--end-date',
-        dest='end_date',
-        default=None,
-        type=str,
-        help='Ending date.')
-
-    args = parser.parse_args()
-    NCPU = args.ncpu
-    START_DATE = args.start_date
-    END_DATE = args.end_date
 
     INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
     OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
     SOUND_DIR = "/data/vlouf/data/soudings_netcdf/"
     FIGURE_CHECK_PATH = os.path.expanduser('~')
 
-    if not (START_DATE and END_DATE):
-        parser.error("Starting and ending date required.")
-
-    try:
-        datetime.datetime.strptime(START_DATE, "%Y%m%d")
-        datetime.datetime.strptime(END_DATE, "%Y%m%d")
-    except:
-        print("Did not understand the date format. Must be YYYYMMDD.")
-        sys.exit()
+    # welcome_msg = "Leveling treatment of CPOL data from level 1a to level 1b."
+    #
+    # parser = argparse.ArgumentParser(description=welcome_msg)
+    # parser.add_argument(
+    #     '-j',
+    #     '--cpu',
+    #     dest='ncpu',
+    #     default=16,
+    #     type=int,
+    #     help='Number of process')
+    #
+    # parser.add_argument(
+    #     '-s',
+    #     '--start-date',
+    #     dest='start_date',
+    #     default=None,
+    #     type=str,
+    #     help='Starting date.')
+    #
+    # parser.add_argument(
+    #     '-e',
+    #     '--end-date',
+    #     dest='end_date',
+    #     default=None,
+    #     type=str,
+    #     help='Ending date.')
+    #
+    # args = parser.parse_args()
+    # NCPU = args.ncpu
+    # START_DATE = args.start_date
+    # END_DATE = args.end_date
+    #
+    #
+    # if not (START_DATE and END_DATE):
+    #     parser.error("Starting and ending date required.")
+    #
+    # try:
+    #     datetime.datetime.strptime(START_DATE, "%Y%m%d")
+    #     datetime.datetime.strptime(END_DATE, "%Y%m%d")
+    # except:
+    #     print("Did not understand the date format. Must be YYYYMMDD.")
+    #     sys.exit()
 
     log_file_name =  os.path.join(os.path.expanduser('~'), 'cpol_level1b.log')
     logging.basicConfig(
