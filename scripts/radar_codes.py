@@ -20,9 +20,7 @@ Codes for correcting and estimating various radar and meteorological parameters.
     kdp_from_phidp_finitediff
     liquid_ice_mass
     nearest
-    refold_vdop
     snr_and_sounding
-    unfold_phi
     unfold_phidp_vdop
     unfold_velocity
 """
@@ -54,7 +52,7 @@ from csu_radartools import csu_kdp, csu_liquid_ice_mass, csu_fhc
 import phidp_codes
 
 
-def bringi_phidp_kdp(radar, refl_name='DBZ', phidp_name='PHIDP'):
+def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
     """
     Compute PHIDP and KDP using Bringi's algorithm.
 
@@ -62,6 +60,8 @@ def bringi_phidp_kdp(radar, refl_name='DBZ', phidp_name='PHIDP'):
     ===========
         radar:
             Py-ART radar structure
+        gatefilter:
+            Radar GateFilter (excluding bad data).
         refl_name: str
             Reflectivity field name
         phidp_name: str
@@ -75,17 +75,19 @@ def bringi_phidp_kdp(radar, refl_name='DBZ', phidp_name='PHIDP'):
             KDP Bringi
     """
 
-    refl = radar.fields[refl_name]['data'].filled(fill_value = np.NaN)
-    phidp = radar.fields[phidp_name]['data'].filled(fill_value = np.NaN)
+    refl = radar.fields[refl_name]['data']
+    phidp = radar.fields[phidp_name]['data']
+    refl = np.ma.masked_where(gatefilter.gate_excluded, refl).filled(-9999)
+    phidp = np.ma.masked_where(gatefilter.gate_excluded, phidp).filled(-9999)
     r = radar.range['data']
 
     rng2d, az2d = np.meshgrid(radar.range['data'], radar.azimuth['data'])
     dr = (r[1] - r[0])  # m
 
-    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(dp=phidp, dz=refl, rng=rng2d/1000.0, thsd=6, gs=dr, window=3, bad=np.NaN)
+    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(dp=phidp, dz=refl, rng=rng2d/1000.0, thsd=6, gs=dr, window=1, bad=-9999)
 
-    fdN = np.ma.masked_where(np.isnan(fdN), fdN)
-    kdN = np.ma.masked_where(np.isnan(kdN), kdN)
+    fdN = np.ma.masked_where(fdN == -9999, fdN)
+    kdN = np.ma.masked_where(kdN == -9999, kdN)
 
     return fdN, kdN
 
@@ -474,39 +476,6 @@ def nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
 
-def refold_vdop(vdop_art, v_nyq_vel, rth_position):
-    """
-    Refold Doppler velocity from PHIDP folding position.
-
-    Parameters:
-    ===========
-        vdop_art: array
-            Doppler velocity
-        v_nyq_vel: float
-            Nyquist velocity.
-        rth_position: list
-            Folding position of PHIDP along axis 2 (length of rth_position is
-            length of axis 1).
-
-    Returns:
-    ========
-        new_vdop: array
-            Properly folded doppler velocity.
-    """
-    new_vdop = vdop_art
-    for j in range(len(rth_position)):
-        i = rth_position[j]
-        if i == 0:
-            continue
-        else:
-            new_vdop[j, i:] += v_nyq_vel
-
-    pos = (vdop_art > v_nyq_vel)
-    new_vdop[pos] = new_vdop[pos] - 2*v_nyq_vel
-
-    return new_vdop
-
-
 def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     """
     Compute the signal-to-noise ratio as well as interpolating the radiosounding
@@ -573,46 +542,8 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     return z_dict, temp_info_dict, snr
 
 
-def unfold_phi(phidp, kdp):
-    """
-    Alternative phase unfolding which completely relies on Kdp.
-    This unfolding should be used in oder to iteratively reconstruct
-    phidp and Kdp. Function from wradlib.
-
-    Parameters:
-    ===========
-        phidp : array
-        kdp : array
-
-    Returns:
-    ========
-        phidp: array
-        rth_pos: list
-            Position of folding along axis 1.
-    """
-    # unfold phidp
-    shape = phidp.shape
-    phidp = phidp.reshape((-1, shape[-1]))
-    kdp = kdp.reshape((-1, shape[-1]))
-
-    rth_pos = np.zeros((phidp.shape[0]), dtype=np.int32)
-
-    for beam in range(phidp.shape[0]):
-        below_th3 = kdp[beam] < -20
-        try:
-            idx1 = np.where(below_th3)[0][2]
-            phidp[beam, idx1:] += 360
-            rth_pos[beam] = idx1
-        except Exception:
-            pass
-
-    if len(rth_pos[rth_pos != 0]) == 0:
-        rth_pos = None
-
-    return phidp.reshape(shape), rth_pos
-
-
-def unfold_phidp_vdop(radar, phidp_name='PHIDP', kdp_name='KDP', vel_name='VEL', unfold_vel=False):
+def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI',
+                      vel_name='VEL', unfold_vel=False):
     """
     Unfold PHIDP and refold Doppler velocity.
 
@@ -636,43 +567,59 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', kdp_name='KDP', vel_name='VEL',
         vdop_refolded: dict
             Refolded Doppler velocity.
     """
-    fdN = radar.fields[phidp_name]['data']
-    kdN = radar.fields[kdp_name]['data']
-    rhohv = radar.fields['RHOHV_CORR']['data']
-    vdop_art = radar.fields[vel_name]['data']
+    # Initialize returns
+    phidp_unfold = None
+    vdop_refolded = None
 
+    # Extract data
+    phidp = radar.fields[phidp_name]['data']
+    phidp_bringi = radar.fields[phidp_bringi_name]['data'].filled(np.NaN)
+    vdop = radar.fields[vel_name]['data'].filled(np.NaN)
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
     except:
-        v_nyq_vel = np.max(np.abs(vdop_art))
+        v_nyq_vel = np.max(np.abs(vdop))
 
-    phidp = deepcopy(fdN)
-    phidp = np.ma.masked_where(rhohv < 0.5, phidp).filled(fill_value=np.NaN)
-    smooth_phidp = phidp_codes.smooth_data_unfolding(phidp)
-    smooth_phidp = np.ma.masked_where((rhohv < 0.5) | np.isnan(phidp), smooth_phidp)
+    # Create gatefilter on PHIDP Bringi (the unfolding is based upon PHIDP Bringi)
+    gf = pyart.filters.GateFilter(radar)
+    gf.exclude_masked(phidp_bringi_name)
 
-    pos_unfold = phidp_codes.get_fold_position(smooth_phidp)
-    new_phidp_unfold = phidp_codes.unfold_phidp(phidp, pos_unfold)
+    # Looking for folded area of PHIDP
+    [beam, ray] = np.where(phidp_bringi < 0)
+    # Excluding the first 20 km.
+    ray[ray <= 80] = 9999
+    # Initializing empty array.
+    posr = []
+    posazi = []
+    for cnt, onebeam in enumerate(np.unique(beam)):
+        # We exclude "noise" value by only taking into account beams that have a
+        # significant amount of negative values (e.g. 5).
+        if len(beam[beam == onebeam]) < 5:
+            continue
+        else:
+            posr.append(np.nanmin(ray[beam == onebeam]))
+            posazi.append(onebeam)
 
-    phidp_unfold_smooth = phidp_codes.smooth_data_unfolding(new_phidp_unfold)
+    # If there is no folding, Doppler does not have to be corrected.
+    if len(posr) == 0:
+        unfold_vel = False
+    else:
+        phidp = phidp_codes.unfold_phidp(deepcopy(phidp), posr, posazi)
+        # Calculating the offset.
+        phidp_offset = np.nanmean(np.nanmin(phidp, axis=1))
+        phidp_unfold = phidp - phidp_offset
 
-    red_phi = phidp_codes.redress_data(phidp_unfold_smooth, 90)
-    phidp_unfold = np.ma.masked_where((rhohv < 0.5) | np.isnan(phidp) | np.isnan(red_phi), red_phi)
-
-    if len(pos_unfold[pos_unfold != 0]) == 0:
-        pos_unfold = None
-
-    vdop_refolded = None
+    # Refold Doppler.
     if unfold_vel:
-        if pos_unfold is not None:
-            vdop_refolded = refold_vdop(vdop_art, v_nyq_vel, pos_unfold)
+        vdop_refolded = phidp_codes.refold_vdop(deepcopy(vdop_art), v_nyq_vel, posr, posazi)
 
     return phidp_unfold, vdop_refolded
 
 
-def unfold_velocity(radar, my_gatefilter, vel_name=None):
+def unfold_velocity(radar, my_gatefilter, vel_name='VEL'):
     """
-    Unfold Doppler velocity using Py-ART region based algorithm.
+    Unfold Doppler velocity using Py-ART region based algorithm. Automatically
+    searches for a folding-corrected velocity field.
 
     Parameters:
     ===========
@@ -681,23 +628,36 @@ def unfold_velocity(radar, my_gatefilter, vel_name=None):
         my_gatefilter:
             GateFilter
         vel_name: str
-            Name of the Doppler velocity field.
+            Name of the (original) Doppler velocity field.
 
     Returns:
     ========
         vdop_vel: dict
             Unfolded Doppler velocity.
     """
-    if vel_name is None:
-        raise ValueError('Name of Doppler velocity field not provided.')
+    gf = deepcopy(my_gatefilter)
+    try:
+        # Looking for a folding-corrected velocity field.
+        vdop_art = radar.fields['VEL_CORR']['data']
+        # Because 'VEL_CORR' field is based upon 'PHIDP_BRINGI', we need to
+        # exclude the gates has been dropped by the Bringi algo.
+        gf.exclude_masked('PHIDP_BRINGI')
+        vel_name = 'VEL_CORR'
+    except KeyError:
+        # Standard velocity field. No correction has been applied to it.
+        vdop_art = radar.fields[vel_name]['data']
 
+    # Trying to determine Nyquist velocity
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
     except:
-        vdop_art = radar.fields[vel_name]['data']
         v_nyq_vel = np.max(np.abs(vdop_art))
 
-    vdop_vel = pyart.correct.dealias_region_based(radar, vel_field=vel_name, gatefilter=my_gatefilter, nyquist_vel=v_nyq_vel)
-    # vdop_vel['standard_name'] = radar.fields[vel_name]['standard_name']
+    # Cf. mail from Bobby Jackson for skip_between_rays parameters.
+    vdop_vel = pyart.correct.dealias_region_based(radar,
+                                                  vel_field=vel_name,
+                                                  gatefilter=gf,
+                                                  nyquist_vel=v_nyq_vel,
+                                                  skip_between_rays=2000)
 
     return vdop_vel

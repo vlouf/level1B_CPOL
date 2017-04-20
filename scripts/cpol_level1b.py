@@ -25,7 +25,7 @@ import datetime
 import warnings
 from multiprocessing import Pool
 
-# Other Libraries -- Matplotlib must be called first
+# Other Libraries -- Matplotlib must be imported first
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.colors as colors
@@ -36,7 +36,6 @@ import netCDF4
 import numpy as np
 
 # Custom modules.
-# import raijin_tools
 import radar_codes
 
 
@@ -177,17 +176,16 @@ def production_line(radar_file_name):
 
     # Unfold PHIDP, refold VELOCITY
     phidp_unfold, vdop_refolded = radar_codes.unfold_phidp_vdop(radar, unfold_vel=refold_velocity)
-    radar.add_field_like('PHIDP', 'PHIDP_CORR', phidp_unfold, replace_existing=True)
+    if phidp_unfold is not None:
+        logger.info('PHIDP has been unfolded.')
+        radar.add_field_like('PHIDP', 'PHIDP_CORR', phidp_unfold, replace_existing=True)
     if vdop_refolded is not None:
-        logger.info('Doppler velocity needs to be refolded.')
+        logger.info('Doppler velocity has been refolded.')
         radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
 
     # Unfold VELOCITY
-    try:
-        radar.fields['VEL_CORR']
-        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, vel_name='VEL_CORR')
-    except KeyError:
-        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, vel_name='VEL')
+    # This function will check if a 'VEL_CORR' field exists anyway.
+    vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter)
     radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing = True)
     logger.info('Doppler velocity unfolded.')
 
@@ -209,6 +207,7 @@ def production_line(radar_file_name):
     logger.info('Hydrometeors classification estimated.')
 
     # Liquid/Ice Mass
+    # We decided to not give these products.
     # liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
     # radar.add_field('LWC', liquid_water_mass)
     # radar.add_field('IWC', ice_mass)
@@ -228,12 +227,7 @@ def production_line(radar_file_name):
     radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
     radar.add_field('RHOHV', radar.fields.pop('RHOHV_CORR'), replace_existing=True)
     radar.add_field('ZDR', radar.fields.pop('ZDR_CORR'), replace_existing=True)
-    radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
-    try:
-        radar.fields['VEL_CORR']
-        radar.add_field('VEL', radar.fields.pop('VEL_CORR'), replace_existing=True)
-    except KeyError:
-        pass
+    radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)    
     radar.add_field('VEL_RAW', radar.fields.pop('VEL'), replace_existing=True)
     radar.add_field('VEL', radar.fields.pop('VEL_UNFOLDED'), replace_existing=True)
 
