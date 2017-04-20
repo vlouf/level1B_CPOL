@@ -264,6 +264,18 @@ def production_line(radar_file_name, outpath=None):
 
 
 def production_line_manager(mydate):
+    """
+    The production line manager calls the production line and manages it ;-).
+    It makes sure that input/output directories exist. This is where the
+    multiprocessing is taken care of.
+
+    INPATH and OUTPATH are global variables defined in __main__.
+
+    Parameter:
+    ==========
+        mydate: datetime.datetime
+            Radar data date for which we start the production.
+    """
     year = str(mydate.year)
     datestr = mydate.strftime("%Y%m%d")
     indir = os.path.join(INPATH, year, datestr)
@@ -299,6 +311,9 @@ def production_line_manager(mydate):
 
 
 def main():
+    """
+    Just print a welcoming message and calls the production_line_manager.
+    """
     # Start with a welcome message.
     print("#"*79)
     print("")
@@ -332,14 +347,15 @@ if __name__ == '__main__':
     Global variables definition and logging file initialisation.
     """
 
+    # Main global variables (Path directories).
     INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
     OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
-    SOUND_DIR = "/data/vlouf/data/soudings_netcdf/"
-    FIGURE_CHECK_PATH = os.path.expanduser('~')
+    SOUND_DIR = "/g/data2/rr5/vhl548/soudings_netcdf/"
+    FIGURE_CHECK_PATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/FIGURE_CHECK/"
 
-    welcome_msg = "Leveling treatment of CPOL data from level 1a to level 1b."
-
-    parser = argparse.ArgumentParser(description=welcome_msg)
+    # Parse arguments
+    parser_description = "Leveling treatment of CPOL data from level 1a to level 1b."
+    parser = argparse.ArgumentParser(description=parser_description)
     parser.add_argument(
         '-j',
         '--cpu',
@@ -372,6 +388,7 @@ if __name__ == '__main__':
     if not (START_DATE and END_DATE):
         parser.error("Starting and ending date required.")
 
+    # Checking that dates are recognize.
     try:
         datetime.datetime.strptime(START_DATE, "%Y%m%d")
         datetime.datetime.strptime(END_DATE, "%Y%m%d")
@@ -379,6 +396,7 @@ if __name__ == '__main__':
         print("Did not understand the date format. Must be YYYYMMDD.")
         sys.exit()
 
+    # Creating log file.
     log_file_name =  os.path.join(os.path.expanduser('~'), 'cpol_level1b.log')
     logging.basicConfig(
         level=logging.DEBUG,

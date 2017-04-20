@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -P kl02
+#PBS -q express
+#PBS -l walltime=10:00:00
+#PBS -l mem=32GB
+#PBS -l wd
+#PBS -l ncpus=16
+#PBS -lother=gdata2
+source activate radar
+python cpol_level1b.py -s 19981206 -e 19981231 -j 16
