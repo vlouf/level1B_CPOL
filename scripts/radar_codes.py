@@ -37,14 +37,6 @@ from copy import deepcopy
 import pyart
 import netCDF4
 import numpy as np
-# import skfuzzy as fuzz
-
-from numba import jit, int32, float32
-
-from scipy import ndimage, signal, integrate, interpolate
-from scipy.stats import linregress
-from scipy.ndimage.filters import convolve1d
-from scipy.integrate import cumtrapz
 
 from csu_radartools import csu_kdp, csu_liquid_ice_mass, csu_fhc
 
@@ -417,7 +409,6 @@ def kdp_from_phidp_finitediff(phidp, L=7, dr=1.):
     return kdp / 2. / dr
 
 
-@jit(cache=True)
 def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                     temperature_name='sounding_temperature', height_name='height'):
     """
