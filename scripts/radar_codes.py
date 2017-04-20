@@ -83,8 +83,9 @@ def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
 
     rng2d, az2d = np.meshgrid(radar.range['data'], radar.azimuth['data'])
     dr = (r[1] - r[0])  # m
+    window_size = dr/1000*4 # in km!!!!!
 
-    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(dp=phidp, dz=refl, rng=rng2d/1000.0, thsd=6, gs=dr, window=1, bad=-9999)
+    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d/1000.0, gs=dr, window=window_size, bad=-9999)
 
     fdN = np.ma.masked_where(fdN == -9999, fdN)
     kdN = np.ma.masked_where(kdN == -9999, kdN)
@@ -517,6 +518,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     except IndexError:
         # The radiosoundings for the exact date does not exist, looking for the
         # closest date.
+        print("Sounding file not found, looking for the nearest date.")
         dtime = [datetime.datetime.strptime(dt, 'YPDN_%Y%m%d_%H.nc') for dt in all_sonde_files]
         closest_date = nearest(dtime, radar_start_date)
         sonde_pattern = datetime.datetime.strftime(closest_date, 'YPDN_%Y%m%d*')
@@ -586,12 +588,14 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
 
     # Looking for folded area of PHIDP
     [beam, ray] = np.where(phidp_bringi < 0)
+    print("Found {} negative values".format(len(beam)))
+    apos = np.unique(beam)
     # Excluding the first 20 km.
     ray[ray <= 80] = 9999
     # Initializing empty array.
     posr = []
     posazi = []
-    for cnt, onebeam in enumerate(np.unique(beam)):
+    for onebeam in apos:
         # We exclude "noise" value by only taking into account beams that have a
         # significant amount of negative values (e.g. 5).
         if len(beam[beam == onebeam]) < 5:
@@ -602,16 +606,23 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
 
     # If there is no folding, Doppler does not have to be corrected.
     if len(posr) == 0:
+        print("No posr found unfolding phidp")
         unfold_vel = False
     else:
         phidp = phidp_codes.unfold_phidp(deepcopy(phidp), posr, posazi)
         # Calculating the offset.
-        phidp_offset = np.nanmean(np.nanmin(phidp, axis=1))
-        phidp_unfold = phidp - phidp_offset
+        tmp = deepcopy(phidp)
+        tmp[tmp < 0]  = np.NaN
+        phidp_offset = np.nanmean(np.nanmin(tmp, axis=1))
+        if phidp_offset < 0 or phidp_offset > 90:
+            # Offset too big or too low to be true, therefore it is not applied.
+            phidp_unfold = phidp
+        else:
+            phidp_unfold = phidp - phidp_offset
 
     # Refold Doppler.
     if unfold_vel:
-        vdop_refolded = phidp_codes.refold_vdop(deepcopy(vdop_art), v_nyq_vel, posr, posazi)
+        vdop_refolded = phidp_codes.refold_vdop(deepcopy(vdop), v_nyq_vel, posr, posazi)
 
     return phidp_unfold, vdop_refolded
 

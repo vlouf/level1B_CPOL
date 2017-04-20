@@ -62,7 +62,7 @@ def plot_figure_check(radar, gatefilter, outfilename):
 
     # Initializing figure.
     gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(5, 2, figsize=(10, 25), sharex=True, sharey=True)
+    fig, the_ax = pl.subplots(6, 2, figsize=(10, 30), sharex=True, sharey=True)
     the_ax = the_ax.flatten()
     # Plotting reflectivity
     gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
@@ -72,15 +72,19 @@ def plot_figure_check(radar, gatefilter, outfilename):
     gr.plot_ppi('ZDR_CORR', ax = the_ax[3], gatefilter=gatefilter, vmin=-5, vmax=10)
 
     gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180, cmap='jet')
-    gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='jet')
+    try:
+        gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='jet')
+    except KeyError:
+        gr.plot_ppi('PHIDP', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='jet')
 
-    gr.plot_ppi('VEL', ax = the_ax[6], cmap=pyart.graph.cm.NWSVel, vmin=-15, vmax=15)
-    gr.plot_ppi('VEL_UNFOLDED', ax = the_ax[7], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-15, vmax=15)
+    gr.plot_ppi('VEL', ax = the_ax[6], cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
+    gr.plot_ppi('VEL_UNFOLDED', ax = the_ax[7], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
 
     gr.plot_ppi('SNR', ax = the_ax[8])
-    gr.plot_ppi('KDP', ax = the_ax[9], gatefilter=gatefilter, vmin=-1, vmax=1)
+    gr.plot_ppi('RHOHV', ax = the_ax[9], vmin=0, vmax=1)
 
-    # gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='YlOrRd', vmin=-10, vmax=30)
+    gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='YlOrRd', vmin=-10, vmax=30)
+    gr.plot_ppi('KDP', ax = the_ax[11], vmin=-1, vmax=1)
     # gr.plot_ppi('LWC', ax = the_ax[11], norm=colors.LogNorm(vmin=0.01, vmax=10), gatefilter=gatefilter, cmap='YlOrRd')
 
     for ax_sl in the_ax:
@@ -127,6 +131,7 @@ def production_line(radar_file_name):
     radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
     if radar_start_date.year > 2012:
         refold_velocity = True
+        logger.info('PHIDP and VELOCITY will be refolded.')
     else:
         refold_velocity = False
 
@@ -141,7 +146,7 @@ def production_line(radar_file_name):
         logger.info('SNR already exists.')
     except KeyError:
         radar.add_field('SNR', snr, replace_existing = True)
-        logger.info('SNR saved.')
+        logger.info('SNR calculated.')
 
     # Correct RHOHV
     rho_corr = radar_codes.correct_rhohv(radar)
@@ -167,9 +172,10 @@ def production_line(radar_file_name):
         logger.info('KDP estimated.')
 
     # Bringi PHIDP/KDP
-    phidp_bringi, kdp_bringi = radar_codes.bringi_phidp_kdp(radar)
+    phidp_bringi, kdp_bringi = radar_codes.bringi_phidp_kdp(radar, gatefilter)
     radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
+    # Correcting PHIDP and KDP Bringi's attributes.
     radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_" + radar.fields['PHIDP_BRINGI']['long_name']
     radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
     logger.info('KDP/PHIDP Bringi estimated.')
@@ -182,6 +188,7 @@ def production_line(radar_file_name):
     if vdop_refolded is not None:
         logger.info('Doppler velocity has been refolded.')
         radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
+        radar.fields['VEL_CORR']['long_name'] = radar.fields['VEL_CORR']['long_name'] + "_refolded"
 
     # Unfold VELOCITY
     # This function will check if a 'VEL_CORR' field exists anyway.
@@ -227,14 +234,18 @@ def production_line(radar_file_name):
     radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
     radar.add_field('RHOHV', radar.fields.pop('RHOHV_CORR'), replace_existing=True)
     radar.add_field('ZDR', radar.fields.pop('ZDR_CORR'), replace_existing=True)
-    radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)    
     radar.add_field('VEL_RAW', radar.fields.pop('VEL'), replace_existing=True)
     radar.add_field('VEL', radar.fields.pop('VEL_UNFOLDED'), replace_existing=True)
+    try:
+        vdop_art = radar.fields['PHIDP_CORR']
+        radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
+    except KeyError:
+        pass
 
     # Hardcode mask
     for mykey in radar.fields:
-        if (mykey == 'sounding_temperature' or mykey == 'height' or
-            mykey == 'SNR' or mykey == 'NCP' or mykey == 'HYDRO'):
+        if mykey in ['sounding_temperature', 'height', 'SNR', 'NCP', 'HYDRO']:
+            # Virgin fields that we leave untouched.
             continue
         else:
             radar.fields[mykey]['data'] = radar_codes.filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
@@ -250,7 +261,8 @@ def production_line(radar_file_name):
 
 def main():
     flist = glob.glob("../data/*.nc")
-    production_line(flist[0])
+    fd = "../data/cfrad.20150326_175014.561_to_20150326_175824.808_CPOL_SUR_level1a.nc"
+    production_line(fd)
 
     return None
 
