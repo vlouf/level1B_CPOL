@@ -5,7 +5,7 @@ CPOL Level 1b main production line.
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
 @date: 04/04/2017
-@version: 0.5
+@version: 0.6
 
 .. autosummary::
     :toctree: generated/
@@ -27,16 +27,19 @@ from multiprocessing import Pool
 
 # Other Libraries -- Matplotlib must be imported first
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
 import matplotlib.colors as colors
 import matplotlib.pyplot as pl
 
 import pyart
 import netCDF4
+import crayons  # For the welcoming message only.
 import numpy as np
+import pandas as pd
 
 # Custom modules.
 import radar_codes
+import raijin_tools
 
 
 def plot_figure_check(radar, gatefilter, outfilename):
@@ -97,7 +100,7 @@ def plot_figure_check(radar, gatefilter, outfilename):
     return None
 
 
-def production_line(radar_file_name):
+def production_line(radar_file_name, outpath=None):
     """
     Production line for correcting and estimating CPOL data radar parameters.
     The naming convention for these parameters is assumed to be DBZ, ZDR, VEL,
@@ -112,7 +115,8 @@ def production_line(radar_file_name):
     # Create output file name and check if it already exists.
     outfilename = os.path.basename(radar_file_name)
     outfilename = outfilename.replace("level1a", "level1b")
-    outpath = os.path.expanduser('~')
+    if outpath is None:
+        outpath = os.path.expanduser('~')
     outfilename = os.path.join(outpath, outfilename)
     if os.path.isfile(outfilename):
         logger.error('Output file already exists. Nothing done.')
@@ -259,10 +263,66 @@ def production_line(radar_file_name):
     return None
 
 
+def production_line_manager(mydate):
+    year = str(mydate.year)
+    datestr = mydate.strftime("%Y%m%d")
+    indir = os.path.join(INPATH, year, datestr)
+    outdir = os.path.join(OUTPATH, year, datestr)
+
+    # Checking if input directory exists.
+    if not os.path.exists(indir):
+        logger.error("Input directory %s does not exist.", indir)
+        return None
+
+    # Checking if output directory exists. Creating them otherwise.
+    if not os.path.isdir(os.path.join(OUTPATH, year)):
+        os.mkdir(os.path.join(OUTPATH, year))
+    if not os.path.isdir(outdir):
+        os.mkdir(outdir)
+
+    # List netcdf files in directory.
+    flist = raijin_tools.get_files(indir)
+    if len(flist) == 0:
+        logger.error('%s empty.', indir)
+        return None
+    logger.info('%i files found for %s', len(flist), datestr)
+
+    # Because we use multiprocessing, we need to send a list of tuple as argument of Pool.starmap.
+    args_list = [None]*len(flist)  # yes, I like declaring empty array.
+    for cnt, onefile in enumerate(flist):
+        args_list[cnt] = (onefile, outdir)
+
+    with Pool(NCPU) as pool:
+        pool.starmap(production_line, args_list)
+
+    return None
+
+
 def main():
-    flist = glob.glob("../data/*.nc")
-    fd = "../data/cfrad.20150326_175014.561_to_20150326_175824.808_CPOL_SUR_level1a.nc"
-    production_line(fd)
+    # Start with a welcome message.
+    print("#"*79)
+    print("")
+    print(" "*25 + crayons.red("CPOL Level 1b production line.", bold=True))
+    print("")
+    print("- Input data directory path is: " + crayons.yellow(INPATH))
+    print("- Output data directory path is: " + crayons.yellow(OUTPATH))
+    print("- Radiosounding directory path is: " + crayons.yellow(SOUND_DIR))
+    print("- Figures will be saved in: " + crayons.yellow(FIGURE_CHECK_PATH))
+    print("- Start date is: " + crayons.yellow(START_DATE))
+    print("- End date is: " + crayons.yellow(END_DATE))
+    print("- A log file can be found in: " + crayons.yellow(log_file_name))
+    print("#"*79)
+    print("")
+
+    # Serious stuffs begin here.
+    date_range = pd.date_range(START_DATE, END_DATE)
+    # One date at a time.
+    for thedate in date_range:
+        try:
+            production_line_manager(thedate)
+        except Exception:
+            # Keeping track of any exceptions that may happen.
+            logger.exception("Received an error for %s", thedate.strftime("%Y%m%d"))
 
     return None
 
@@ -277,48 +337,47 @@ if __name__ == '__main__':
     SOUND_DIR = "/data/vlouf/data/soudings_netcdf/"
     FIGURE_CHECK_PATH = os.path.expanduser('~')
 
-    # welcome_msg = "Leveling treatment of CPOL data from level 1a to level 1b."
-    #
-    # parser = argparse.ArgumentParser(description=welcome_msg)
-    # parser.add_argument(
-    #     '-j',
-    #     '--cpu',
-    #     dest='ncpu',
-    #     default=16,
-    #     type=int,
-    #     help='Number of process')
-    #
-    # parser.add_argument(
-    #     '-s',
-    #     '--start-date',
-    #     dest='start_date',
-    #     default=None,
-    #     type=str,
-    #     help='Starting date.')
-    #
-    # parser.add_argument(
-    #     '-e',
-    #     '--end-date',
-    #     dest='end_date',
-    #     default=None,
-    #     type=str,
-    #     help='Ending date.')
-    #
-    # args = parser.parse_args()
-    # NCPU = args.ncpu
-    # START_DATE = args.start_date
-    # END_DATE = args.end_date
-    #
-    #
-    # if not (START_DATE and END_DATE):
-    #     parser.error("Starting and ending date required.")
-    #
-    # try:
-    #     datetime.datetime.strptime(START_DATE, "%Y%m%d")
-    #     datetime.datetime.strptime(END_DATE, "%Y%m%d")
-    # except:
-    #     print("Did not understand the date format. Must be YYYYMMDD.")
-    #     sys.exit()
+    welcome_msg = "Leveling treatment of CPOL data from level 1a to level 1b."
+
+    parser = argparse.ArgumentParser(description=welcome_msg)
+    parser.add_argument(
+        '-j',
+        '--cpu',
+        dest='ncpu',
+        default=16,
+        type=int,
+        help='Number of process')
+
+    parser.add_argument(
+        '-s',
+        '--start-date',
+        dest='start_date',
+        default=None,
+        type=str,
+        help='Starting date.')
+
+    parser.add_argument(
+        '-e',
+        '--end-date',
+        dest='end_date',
+        default=None,
+        type=str,
+        help='Ending date.')
+
+    args = parser.parse_args()
+    NCPU = args.ncpu
+    START_DATE = args.start_date
+    END_DATE = args.end_date
+
+    if not (START_DATE and END_DATE):
+        parser.error("Starting and ending date required.")
+
+    try:
+        datetime.datetime.strptime(START_DATE, "%Y%m%d")
+        datetime.datetime.strptime(END_DATE, "%Y%m%d")
+    except:
+        print("Did not understand the date format. Must be YYYYMMDD.")
+        sys.exit()
 
     log_file_name =  os.path.join(os.path.expanduser('~'), 'cpol_level1b.log')
     logging.basicConfig(
