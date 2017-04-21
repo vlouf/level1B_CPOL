@@ -42,7 +42,36 @@ import radar_codes
 import raijin_tools
 
 
-def plot_figure_check(radar, gatefilter, outfilename):
+def setup_logger(name, log_file, level=logging.DEBUG):
+    """
+    Function setup as many loggers as you want.
+
+    Parameters:
+    ===========
+        name: str
+            Logger name.
+        log_file: str
+            File name for the logger.
+        level:
+            Level of logging.
+
+    Returns:
+    ========
+        mylogger:
+            The log file.
+    """
+    handler = logging.FileHandler(log_file)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+
+    mylogger = logging.getLogger(name)
+    mylogger.setLevel(level)
+    mylogger.addHandler(handler)
+
+    return mylogger
+
+
+def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     """
     Plot figure of old/new radar parameters for checking purpose.
 
@@ -52,15 +81,29 @@ def plot_figure_check(radar, gatefilter, outfilename):
             Py-ART radar structure.
         gatefilter:
             The Gate filter.
-        outfilename:
+        outfilename: str
             Name given to the output netcdf data file.
+        radar_date: datetime
+            Datetime stucture of the radar data.
     """
+    # Extracting year and date.
+    year = str(radar_date,year)
+    datestr = radar_date.strftime("%Y%m%d_%H%M")
+    # Path for saving Figures.
+    outfile_path = os.path.join(FIGURE_CHECK_PATH, year, datestr)
+
+    # Checking if output directory exists. Creating them otherwise.
+    if not os.path.isdir(os.path.join(FIGURE_CHECK_PATH, year)):
+        os.mkdir(os.path.join(FIGURE_CHECK_PATH, year))
+    if not os.path.isdir(outfile_path):
+        os.mkdir(outfile_path)
+
     # Checking if figure already exists.
     outfile = os.path.basename(outfilename)
     outfile = outfile[:-2] + "png"
-    outfile = os.path.join(FIGURE_CHECK_PATH, outfile)
+    outfile = os.path.join(outfile_path, outfile)
     if os.path.isfile(outfile):
-        logger.error('Figure already exists')
+        gnrl_logger.error('Figure for %s already exists', os.path.basename(outfile))
         return None
 
     # Initializing figure.
@@ -119,27 +162,34 @@ def production_line(radar_file_name, outpath=None):
         outpath = os.path.expanduser('~')
     outfilename = os.path.join(outpath, outfilename)
     if os.path.isfile(outfilename):
-        logger.error('Output file already exists. Nothing done.')
-        print('Output file already exists. Nothing done.')
+        gnrl_logger.error('Output file already exists for: %s.', outfilename)
         return None
+
+    # Start chronometer.
+    start_time = time.time()
 
     # Read the input radar file.
     try:
         radar = pyart.io.read(radar_file_name)
-        logger.info("Opening %s", radar_file_name)
     except:
-        logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
+        gnrl_logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
         return None
 
-    # Get the date and start the chrono.
+    # Get radar's data date and time.
     radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
+    datestr = radar_start_date.strftime("%Y%m%d_%H%M")
+
+    # Spawn logging file for producing this file.
+    log_spawn_name = os.path.join(LOG_FILE_PATH, "production_line_{}.log".format(datestr))
+    logger = setup_logger(datestr, log_spawn_name)
+    logger.info("%s read.", radar_file_name)
+
+    # Check date, if velocity needs to be refolded.
     if radar_start_date.year > 2012:
         refold_velocity = True
         logger.info('PHIDP and VELOCITY will be refolded.')
     else:
         refold_velocity = False
-
-    start_time = time.time()
 
     # Compute SNR
     height, temperature, snr = radar_codes.snr_and_sounding(radar, SOUND_DIR, 'DBZ')
@@ -226,13 +276,13 @@ def production_line(radar_file_name, outpath=None):
 
     # Treatment is finished!
     end_time = time.time()
-    logger.info("Treatment for %s done in %f seconds.", os.path.basename(outfilename), (end_time - start_time))
+    logger.info("Treatment for %s done in %0.2f seconds.", os.path.basename(outfilename), (end_time - start_time))
 
     # Plot check figure.
     logger.info('Plotting figure')
-    plot_figure_check(radar, gatefilter, outfilename)
+    plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
     figure_time = time.time()
-    logger.info("Figure for %s plotted in %f seconds.", os.path.basename(outfilename), (figure_time - end_time))
+    logger.info("Figure for %s plotted in %0.2f seconds.", os.path.basename(outfilename), (figure_time - end_time))
 
     # Rename fields and remove unnecessary ones.
     radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
@@ -253,12 +303,12 @@ def production_line(radar_file_name, outpath=None):
             continue
         else:
             radar.fields[mykey]['data'] = radar_codes.filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
-            logger.info('Hardcoding gatefilter for %s.', mykey)
+    logger.info('Hardcoding gatefilter to Fields done.')
 
     # Write results
-    logger.info('Saving data')
     pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
-    logger.info('Saving %s took %f seconds.', os.path.basename(outfilename), (time.time() - figure_time))
+    logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (time.time() - figure_time))
+    logger.info('%s processed in  %0.2f s.', os.path.basename(outfilename), (time.time() - start_time))
 
     return None
 
@@ -283,7 +333,7 @@ def production_line_manager(mydate):
 
     # Checking if input directory exists.
     if not os.path.exists(indir):
-        logger.error("Input directory %s does not exist.", indir)
+        gnrl_logger.error("Input directory %s does not exist.", indir)
         return None
 
     # Checking if output directory exists. Creating them otherwise.
@@ -295,9 +345,9 @@ def production_line_manager(mydate):
     # List netcdf files in directory.
     flist = raijin_tools.get_files(indir)
     if len(flist) == 0:
-        logger.error('%s empty.', indir)
+        gnrl_logger.error('%s empty.', indir)
         return None
-    logger.info('%i files found for %s', len(flist), datestr)
+    gnrl_logger.info('%i files found for %s', len(flist), datestr)
 
     # Because we use multiprocessing, we need to send a list of tuple as argument of Pool.starmap.
     args_list = [None]*len(flist)  # yes, I like declaring empty array.
@@ -325,7 +375,7 @@ def main():
     print("- Figures will be saved in: " + crayons.yellow(FIGURE_CHECK_PATH))
     print("- Start date is: " + crayons.yellow(START_DATE))
     print("- End date is: " + crayons.yellow(END_DATE))
-    print("- A log file can be found in: " + crayons.yellow(log_file_name))
+    print("- Log files can be found in: " + crayons.yellow(LOG_FILE_PATH))
     print("#"*79)
     print("")
 
@@ -337,7 +387,7 @@ def main():
             production_line_manager(thedate)
         except Exception:
             # Keeping track of any exceptions that may happen.
-            logger.exception("Received an error for %s", thedate.strftime("%Y%m%d"))
+            gnrl_logger.exception("Received an error for %s", thedate.strftime("%Y%m%d"))
 
     return None
 
@@ -346,12 +396,26 @@ if __name__ == '__main__':
     """
     Global variables definition and logging file initialisation.
     """
-
     # Main global variables (Path directories).
     INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
     OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
     SOUND_DIR = "/g/data2/rr5/vhl548/soudings_netcdf/"
     FIGURE_CHECK_PATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/FIGURE_CHECK/"
+    LOG_FILE_PATH = os.path.join(os.path.expanduser('~'), 'logfiles')
+
+    # Check if path exists.
+    if not os.path.isdir(LOG_FILE_PATH):
+        print("Creating log files directory: {}.".format(LOG_FILE_PATH))
+        os.mkdir(LOG_FILE_PATH)
+    if not os.path.isdir(FIGURE_CHECK_PATH):
+        print("Creating output figures directory: {}.".format(FIGURE_CHECK_PATH))
+        os.mkdir(FIGURE_CHECK_PATH)
+    if not os.path.isdir(SOUND_DIR):
+        print("Radiosoundings directory does not exist (or invalid): {}.".format(SOUND_DIR))
+        sys.exit()
+    if not os.path.isdir(INPATH):
+        print("Input data directory does not exist (or invalid): {}.".format(INPATH))
+        sys.exit()
 
     # Parse arguments
     parser_description = "Leveling treatment of CPOL data from level 1a to level 1b."
@@ -363,7 +427,6 @@ if __name__ == '__main__':
         default=16,
         type=int,
         help='Number of process')
-
     parser.add_argument(
         '-s',
         '--start-date',
@@ -371,7 +434,6 @@ if __name__ == '__main__':
         default=None,
         type=str,
         help='Starting date.')
-
     parser.add_argument(
         '-e',
         '--end-date',
@@ -396,14 +458,15 @@ if __name__ == '__main__':
         print("Did not understand the date format. Must be YYYYMMDD.")
         sys.exit()
 
-    # Creating log file.
-    log_file_name =  os.path.join(os.path.expanduser('~'), 'cpol_level1b.log')
+    # Creating the general log file.
+    logname = "cpol_level1b_from_{}_to_{}.log".format(START_DATE, END_DATE)
+    log_file_name =  os.path.join(LOG_FILE_PATH, logname)
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         filename=log_file_name,
         filemode='a+')
-    logger = logging.getLogger(__name__)
+    gnrl_logger = logging.getLogger(__name__)
 
     with warnings.catch_warnings():
         # Just ignoring warning messages.

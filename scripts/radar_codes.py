@@ -292,11 +292,15 @@ def estimate_kdp(radar, gatefilter, phidp_name='PHIDP'):
         kdp_field: dict
             KDP.
     """
-    phidp = radar.fields[phidp_name]['data'].data
     r = radar.range['data']
-
-    phidp[gatefilter.gate_excluded] = np.NaN
     dr = (r[1] - r[0]) / 1000  # km
+
+    # The next two lines are 3 step:
+    # - Extracting PHIDP (it is a masked array)
+    # - Masking gates in PHIDP that are excluded by the gatefilter
+    # - Turning PHIDP into a normal array and filling all masked value to NaN.
+    phidp = radar.fields[phidp_name]['data']
+    phidp = np.ma.masked_where(gatefilter.gate_excluded, phidp).filled(np.NaN)
 
     kdp_data = kdp_from_phidp_finitediff(phidp, dr=dr)
     kdp_field = {'data': kdp_data, 'units': 'degrees/km', 'standard_name': 'specific_differential_phase_hv',
