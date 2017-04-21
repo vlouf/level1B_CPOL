@@ -88,7 +88,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     """
     # Extracting year and date.
     year = str(radar_date.year)
-    datestr = radar_date.strftime("%Y%m%d_%H%M")
+    datestr = radar_date.strftime("%Y%m%d")
     # Path for saving Figures.
     outfile_path = os.path.join(FIGURE_CHECK_PATH, year, datestr)
 
