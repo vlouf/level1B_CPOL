@@ -106,6 +106,7 @@ def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
         atten: array
             Cumulated attenuation (dB)
     """
+    kdp = kdp.filled(0)  # 0 is the neutral value for a sum
     kdp[kdp < 0] = 0
     atten_specific = alpha*kdp
     atten_specific[np.isnan(atten_specific)] = 0
@@ -114,9 +115,10 @@ def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
     return atten_specific, atten
 
 
-def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP'):
+def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP_BRINGI'):
     """
-    Correct attenuation on differential reflectivity.
+    Correct attenuation on differential reflectivity. KDP_BRINGI has been
+    cleaned of noise, that's why we use it.
 
     Parameters:
     ===========
@@ -149,9 +151,10 @@ def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP'):
     return atten_meta, zdr_corr
 
 
-def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP'):
+def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_BRINGI'):
     """
-    Correct attenuation on reflectivity.
+    Correct attenuation on reflectivity. KDP_BRINGI has been
+    cleaned of noise, that's why we use it.
 
     Parameters:
     ===========

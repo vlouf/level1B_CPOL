@@ -144,6 +144,32 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     return None
 
 
+def check_azimuth(radar, radar_file_name):
+    """
+    Checking if radar has a proper azimuth field.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        radar_file_name: str
+            Name of the input radar file.
+    """
+    is_good = True
+    azi = radar.azimuth['data']
+    maxazi = np.max(azi)
+    minazi = np.min(azi)
+
+    if np.abs(maxazi - minazi) < 60:
+        is_good = False
+        # Keeping track of bad files:
+        badfile = os.path.join(os.path.expanduser('~'), 'bad_radar_azimuth.txt')
+        with open(badfile, 'a+') as fid:
+            fid.write(radar_file_name + "\n")
+
+    return is_good
+
+
 def production_line(radar_file_name, outpath=None):
     """
     Production line for correcting and estimating CPOL data radar parameters.
@@ -155,6 +181,8 @@ def production_line(radar_file_name, outpath=None):
     ===========
         radar_file_name: str
             Name of the input radar file.
+        outpath: str
+            Path for saving output data.
     """
     # Create output file name and check if it already exists.
     outfilename = os.path.basename(radar_file_name)
@@ -176,12 +204,21 @@ def production_line(radar_file_name, outpath=None):
         gnrl_logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
         return None
 
+    # Check if radar is correct.
+    if not check_azimuth(radar, radar_file_name):
+        gnrl_logger.error("MAJOR ERROR: %s does not have a proper azimuth.", radar_file_name)
+        return None
+
     # Get radar's data date and time.
     radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
     datestr = radar_start_date.strftime("%Y%m%d_%H%M")
 
     # Spawn logging file for producing this file.
-    log_spawn_name = os.path.join(LOG_FILE_PATH, "production_line_{}.log".format(datestr))
+    log_spawn_name = os.path.join(LOG_FILE_PATH, radar_start_date.strftime("%Y%m%d"))
+    if not os.path.isdir(log_spawn_name):
+        # Check if directory for log files exists and creates it if not.
+        os.mkdir(log_spawn_name)
+    log_spawn_name = os.path.join(log_spawn_name, "production_line_{}.log".format(datestr))
     logger = setup_logger(datestr, log_spawn_name)
     logger.info("%s read.", radar_file_name)
 
@@ -314,7 +351,7 @@ def production_line(radar_file_name, outpath=None):
     # Gridding (and saving)
     gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=OUTPATH_GRID)
     gridding_codes.gridding_radar_70km(radar, radar_start_date, outpath=OUTPATH_GRID)
-    logger.info('Gridding done in %0.2f s.', os.path.basename(outfilename), (time.time() - save_time))
+    logger.info('Gridding done in %0.2f s.', (time.time() - save_time))
 
     # Processing finished!
     logger.info('%s processed in  %0.2f s.', os.path.basename(outfilename), (time.time() - start_time))
@@ -417,6 +454,9 @@ if __name__ == '__main__':
     if not os.path.isdir(LOG_FILE_PATH):
         print("Creating log files directory: {}.".format(LOG_FILE_PATH))
         os.mkdir(LOG_FILE_PATH)
+    if not os.path.isdir(OUTPATH_GRID):
+        print("Creating output figures directory: {}.".format(OUTPATH_GRID))
+        os.mkdir(OUTPATH_GRID)
     if not os.path.isdir(FIGURE_CHECK_PATH):
         print("Creating output figures directory: {}.".format(FIGURE_CHECK_PATH))
         os.mkdir(FIGURE_CHECK_PATH)
