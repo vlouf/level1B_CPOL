@@ -40,6 +40,7 @@ import pandas as pd
 # Custom modules.
 import radar_codes
 import raijin_tools
+import gridding_codes
 
 
 def setup_logger(name, log_file, level=logging.DEBUG):
@@ -307,7 +308,15 @@ def production_line(radar_file_name, outpath=None):
 
     # Write results
     pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
-    logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (time.time() - figure_time))
+    save_time = time.time()
+    logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (save_time - figure_time))
+
+    # Gridding (and saving)
+    gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=OUTPATH_GRID)
+    gridding_codes.gridding_radar_70km(radar, radar_start_date, outpath=OUTPATH_GRID)
+    logger.info('Gridding done in %0.2f s.', os.path.basename(outfilename), (time.time() - save_time))
+
+    # Processing finished!
     logger.info('%s processed in  %0.2f s.', os.path.basename(outfilename), (time.time() - start_time))
 
     return None
@@ -399,6 +408,7 @@ if __name__ == '__main__':
     # Main global variables (Path directories).
     INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
     OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
+    OUTPATH_GRID = "/g/data2/rr5/vhl548/CPOL_PROD_1b/GRIDDED/"
     SOUND_DIR = "/g/data2/rr5/vhl548/soudings_netcdf/"
     FIGURE_CHECK_PATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/FIGURE_CHECK/"
     LOG_FILE_PATH = os.path.join(os.path.expanduser('~'), 'logfiles')
