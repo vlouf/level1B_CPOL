@@ -648,7 +648,7 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
     return phidp_unfold, vdop_refolded
 
 
-def unfold_velocity(radar, my_gatefilter, vel_name='VEL'):
+def unfold_velocity(radar, my_gatefilter, bobby_params=True, vel_name='VEL'):
     """
     Unfold Doppler velocity using Py-ART region based algorithm. Automatically
     searches for a folding-corrected velocity field.
@@ -659,6 +659,9 @@ def unfold_velocity(radar, my_gatefilter, vel_name='VEL'):
             Py-ART radar structure.
         my_gatefilter:
             GateFilter
+        bobby_params: bool
+            Using dealiasing parameters from Bobby Jackson. Otherwise using
+            defaults configuration.
         vel_name: str
             Name of the (original) Doppler velocity field.
 
@@ -686,10 +689,16 @@ def unfold_velocity(radar, my_gatefilter, vel_name='VEL'):
         v_nyq_vel = np.max(np.abs(vdop_art))
 
     # Cf. mail from Bobby Jackson for skip_between_rays parameters.
-    vdop_vel = pyart.correct.dealias_region_based(radar,
-                                                  vel_field=vel_name,
-                                                  gatefilter=gf,
-                                                  nyquist_vel=v_nyq_vel,
-                                                  skip_between_rays=2000)
+    if bobby_params:
+        vdop_vel = pyart.correct.dealias_region_based(radar,
+                                                      vel_field=vel_name,
+                                                      gatefilter=gf,
+                                                      nyquist_vel=v_nyq_vel,
+                                                      skip_between_rays=2000)
+    else:
+        vdop_vel = pyart.correct.dealias_region_based(radar,
+                                                      vel_field=vel_name,
+                                                      gatefilter=gf,
+                                                      nyquist_vel=v_nyq_vel)
 
     return vdop_vel
