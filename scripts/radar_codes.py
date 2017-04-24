@@ -551,16 +551,27 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     times = interp_sonde.variables['time'][:]
     heights = interp_sonde.variables['height'][:]
 
+    # Height and temperature profiles.
     my_profile = pyart.retrieve.fetch_radar_time_profile(interp_sonde, radar)
     z_dict, temp_dict = pyart.retrieve.map_profile_to_gates(temperatures, my_profile['height'], radar)
     temp_info_dict = {'data': temp_dict['data'],
                  'long_name': 'Sounding temperature at gate',
                  'standard_name' : 'temperature',
-                 'valid_min' : -100,
-                 'valid_max' : 100,
+                 'valid_min' : -100, 'valid_max' : 100,
                  'units' : 'degrees Celsius',
                  'comment': 'Radiosounding date: %s' % (radar_start_date.strftime("%Y/%m/%d"))}
+
+    # Calculte SNR
+    cnt = 1
     snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name)
+    # Sometimes the SNR is an empty array, this is due to the toa parameter.
+    # Here we try to recalculate the SNR with a lower toa value.
+    while snr['data'].count == 0:
+        snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name, toa=25000-1000*cnt)
+        cnt += 1
+        # Break after the fifth attempt.
+        if cnt > 5:
+            break
 
     return z_dict, temp_info_dict, snr
 

@@ -200,7 +200,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Unfold VELOCITY
     # This function will check if a 'VEL_CORR' field exists anyway.
-    vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=refold_velocity)        
+    vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=refold_velocity)
     radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing = True)
     logger.info('Doppler velocity unfolded.')
 
@@ -387,7 +387,7 @@ if __name__ == '__main__':
     # Output directory for verification figures.
     FIGURE_CHECK_PATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/FIGURE_CHECK/"
     # Output directory for log files.
-    LOG_FILE_PATH = os.path.join(os.path.expanduser('~'), 'logfiles')
+    LOG_FILE_PATH = "/short/kl02/vhl548/logfiles/"
     # Time in seconds for which each subprocess is allowed to live.
     TIME_BEFORE_DEATH = 600 # seconds before killing process.
 

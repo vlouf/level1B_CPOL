@@ -52,28 +52,30 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
     gr.plot_ppi('DBZ_CORR', ax = the_ax[1], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSRef, vmin=-10, vmax=70)
 
-    gr.plot_ppi('ZDR', ax = the_ax[2], vmin=-5, vmax=10)  # ZDR
-    gr.plot_ppi('ZDR_CORR', ax = the_ax[3], gatefilter=gatefilter, vmin=-5, vmax=10)
+    gr.plot_ppi('ZDR', ax = the_ax[2], vmin=-5, vmax=10, cmap='rainbow')  # ZDR
+    gr.plot_ppi('ZDR_CORR', ax = the_ax[3], gatefilter=gatefilter, vmin=-5, vmax=10, cmap='rainbow')
 
-    gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180, cmap='jet')
+    gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180, cmap='OrRd')
     try:
-        gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='jet')
+        gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='OrRd')
     except KeyError:
-        gr.plot_ppi('PHIDP', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='jet')
+        gr.plot_ppi('PHIDP', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='OrRd')
 
     gr.plot_ppi('VEL', ax = the_ax[6], cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
     gr.plot_ppi('VEL_UNFOLDED', ax = the_ax[7], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
 
-    gr.plot_ppi('SNR', ax = the_ax[8])
-    gr.plot_ppi('RHOHV', ax = the_ax[9], vmin=0, vmax=1)
+    gr.plot_ppi('SNR', ax = the_ax[8], cmap='OrRd')
+    gr.plot_ppi('RHOHV', ax = the_ax[9], vmin=0, vmax=1, norm=colors.LogNorm(vmin=0.4, vmax=1), cmap='rainbow')
 
-    gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='YlOrRd', vmin=-10, vmax=30)
-    gr.plot_ppi('KDP', ax = the_ax[11], vmin=-1, vmax=1)
+    gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='OrRd', vmin=-10, vmax=30)
+    gr.plot_ppi('KDP', ax = the_ax[11], vmin=0, vmax=1, cmap='OrRd')
     # gr.plot_ppi('LWC', ax = the_ax[11], norm=colors.LogNorm(vmin=0.01, vmax=10), gatefilter=gatefilter, cmap='YlOrRd')
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
-        ax_sl.axis((-150, 150, -150, 150))
+        ax_sl.set_aspect(1)
+        ax_sl.set_xlim(-150, 150)
+        ax_sl.set_ylim(-150, 150)
 
     pl.tight_layout()
     pl.savefig(outfile)  # Saving figure.
