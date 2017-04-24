@@ -65,7 +65,8 @@ def chunks(l, n):
 
 def check_azimuth(radar, radar_file_name):
     """
-    Checking if radar has a proper azimuth field.
+    Checking if radar has a proper azimuth field.  It's a minor problem
+    concerning less than 7 days in the entire dataset.
 
     Parameters:
     ===========
@@ -85,11 +86,11 @@ def check_azimuth(radar, radar_file_name):
     minazi = np.min(azi)
 
     if np.abs(maxazi - minazi) < 60:
-        is_good = False
+        is_good = False        
         # Keeping track of bad files:
-        badfile = os.path.join(os.path.expanduser('~'), 'bad_radar_azimuth.txt')
-        with open(badfile, 'a+') as fid:
-            fid.write(radar_file_name + "\n")
+        # badfile = os.path.join(os.path.expanduser('~'), 'bad_radar_azimuth.txt')
+        # with open(badfile, 'a+') as fid:
+        #     fid.write(radar_file_name + "\n")
 
     return is_good
 
