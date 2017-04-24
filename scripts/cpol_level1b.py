@@ -317,7 +317,7 @@ def production_line(radar_file_name, outpath=None):
     radar.add_field('HYDRO', hydro_class, replace_existing=True)
     logger.info('Hydrometeors classification estimated.')
     # Check if Hail it found hail.
-    if (hydro_class == 9).sum() != 0:
+    if (hydro_class['data'] == 9).sum() != 0:
         print("WARNING: hail detection in Darwin. NOT POSSIBLE!", os.path.basename(outfilename))
         fout = os.path.join(os.path.expanduser('~'), "hail_detection.txt")
         with open(fout, "a+") as fid:
