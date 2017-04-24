@@ -4,14 +4,19 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 04/04/2017
-@version: 0.6
+@date: 22/04/2017
+@version: 0.7
 
 .. autosummary::
     :toctree: generated/
 
+    timeout_handler
+    chunks
+    setup_logger
     plot_figure_check
+    check_azimuth
     production_line
+    production_line_manager
     main
 """
 # Python Standard Library
@@ -19,6 +24,7 @@ import os
 import sys
 import glob
 import time
+import signal
 import logging
 import argparse
 import datetime
@@ -43,33 +49,21 @@ import raijin_tools
 import gridding_codes
 
 
-def setup_logger(name, log_file, level=logging.DEBUG):
+class TimeoutException(Exception):   # Custom exception class
+    pass
+
+
+def timeout_handler(signum, frame):   # Custom signal handler
+    raise TimeoutException
+
+
+def chunks(l, n):
     """
-    Function setup as many loggers as you want.
-
-    Parameters:
-    ===========
-        name: str
-            Logger name.
-        log_file: str
-            File name for the logger.
-        level:
-            Level of logging.
-
-    Returns:
-    ========
-        mylogger:
-            The log file.
+    Yield successive n-sized chunks from l.
+    From http://stackoverflow.com/a/312464
     """
-    handler = logging.FileHandler(log_file)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-
-    mylogger = logging.getLogger(name)
-    mylogger.setLevel(level)
-    mylogger.addHandler(handler)
-
-    return mylogger
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
 
 
 def plot_figure_check(radar, gatefilter, outfilename, radar_date):
@@ -104,7 +98,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     outfile = outfile[:-2] + "png"
     outfile = os.path.join(outfile_path, outfile)
     if os.path.isfile(outfile):
-        gnrl_logger.error('Figure for %s already exists', os.path.basename(outfile))
+        logger.error('Figure for %s already exists', os.path.basename(outfile))
         return None
 
     # Initializing figure.
@@ -154,6 +148,11 @@ def check_azimuth(radar, radar_file_name):
             Py-ART radar structure.
         radar_file_name: str
             Name of the input radar file.
+
+    Return:
+    =======
+        is_good: bool
+            True if radar has a proper azimuth field.
     """
     is_good = True
     azi = radar.azimuth['data']
@@ -191,7 +190,7 @@ def production_line(radar_file_name, outpath=None):
         outpath = os.path.expanduser('~')
     outfilename = os.path.join(outpath, outfilename)
     if os.path.isfile(outfilename):
-        gnrl_logger.error('Output file already exists for: %s.', outfilename)
+        logger.error('Output file already exists for: %s.', outfilename)
         return None
 
     # Start chronometer.
@@ -201,25 +200,17 @@ def production_line(radar_file_name, outpath=None):
     try:
         radar = pyart.io.read(radar_file_name)
     except:
-        gnrl_logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
+        logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
         return None
 
     # Check if radar is correct.
     if not check_azimuth(radar, radar_file_name):
-        gnrl_logger.error("MAJOR ERROR: %s does not have a proper azimuth.", radar_file_name)
+        logger.error("MAJOR ERROR: %s does not have a proper azimuth.", radar_file_name)
         return None
 
     # Get radar's data date and time.
     radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
     datestr = radar_start_date.strftime("%Y%m%d_%H%M")
-
-    # Spawn logging file for producing this file.
-    log_spawn_name = os.path.join(LOG_FILE_PATH, radar_start_date.strftime("%Y%m%d"))
-    if not os.path.isdir(log_spawn_name):
-        # Check if directory for log files exists and creates it if not.
-        os.mkdir(log_spawn_name)
-    log_spawn_name = os.path.join(log_spawn_name, "production_line_{}.log".format(datestr))
-    logger = setup_logger(datestr, log_spawn_name)
     logger.info("%s read.", radar_file_name)
 
     # Check date, if velocity needs to be refolded.
@@ -379,7 +370,7 @@ def production_line_manager(mydate):
 
     # Checking if input directory exists.
     if not os.path.exists(indir):
-        gnrl_logger.error("Input directory %s does not exist.", indir)
+        logger.error("Input directory %s does not exist.", indir)
         return None
 
     # Checking if output directory exists. Creating them otherwise.
@@ -391,17 +382,34 @@ def production_line_manager(mydate):
     # List netcdf files in directory.
     flist = raijin_tools.get_files(indir)
     if len(flist) == 0:
-        gnrl_logger.error('%s empty.', indir)
+        logger.error('%s empty.', indir)
         return None
-    gnrl_logger.info('%i files found for %s', len(flist), datestr)
+    logger.info('%i files found for %s', len(flist), datestr)
 
-    # Because we use multiprocessing, we need to send a list of tuple as argument of Pool.starmap.
-    args_list = [None]*len(flist)  # yes, I like declaring empty array.
-    for cnt, onefile in enumerate(flist):
-        args_list[cnt] = (onefile, outdir)
+    # Cutting the file list into smaller chunks. (The multiprocessing.Pool instance
+    # is freed from memory, at each iteration of the main for loop).
+    for flist_slice in chunks(flist, NCPU):
+        # Because we use multiprocessing, we need to send a list of tuple as argument of Pool.starmap.
+        args_list = [None]*len(flist_slice)  # yes, I like declaring empty array.
+        for cnt, onefile in enumerate(flist_slice):
+            args_list[cnt] = (onefile, outdir)
 
-    with Pool(NCPU) as pool:
-        pool.starmap(production_line, args_list)
+        # If we are stuck in the loop for more than TIME_BEFORE_DEATH seconds,
+        # it will raise a TimeoutException that will kill the current process
+        # and go to the next iteration.
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(TIME_BEFORE_DEATH)
+        try:
+            # Start multiprocessing.
+            with Pool(NCPU) as pool:
+                pool.starmap(production_line, args_list)
+        except TimeoutException:
+            # Treatment time was too long.
+            print("TOO MUCH TIME SPENT FROM %s to %s " % (flist_slice[0], flist_slice[-1]))
+            logger.error("TOO MUCH TIME SPENT FROM %s to %s " % (flist_slice[0], flist_slice[-1]))
+            continue  # Go to next iteration.
+        else:
+            signal.alarm(0)
 
     return None
 
@@ -422,6 +430,7 @@ def main():
     print("- Start date is: " + crayons.yellow(START_DATE))
     print("- End date is: " + crayons.yellow(END_DATE))
     print("- Log files can be found in: " + crayons.yellow(LOG_FILE_PATH))
+    print("- Each subprocess has {}s of allowed time life before being killed.".format(TIME_BEFORE_DEATH))
     print("#"*79)
     print("")
 
@@ -433,7 +442,7 @@ def main():
             production_line_manager(thedate)
         except Exception:
             # Keeping track of any exceptions that may happen.
-            gnrl_logger.exception("Received an error for %s", thedate.strftime("%Y%m%d"))
+            logger.exception("Received an error for %s", thedate.strftime("%Y%m%d"))
 
     return None
 
@@ -443,14 +452,23 @@ if __name__ == '__main__':
     Global variables definition and logging file initialisation.
     """
     # Main global variables (Path directories).
+    # Input radar data directory
     INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
+    # Output directory for CF/Radial PPIs
     OUTPATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/"
+    # Output directory for GRIDDED netcdf data.
     OUTPATH_GRID = "/g/data2/rr5/vhl548/CPOL_PROD_1b/GRIDDED/"
+    # Input directory for Radiosoundings (use my other script, named caprica to
+    # download and format these datas).
     SOUND_DIR = "/g/data2/rr5/vhl548/soudings_netcdf/"
+    # Output directory for verification figures.
     FIGURE_CHECK_PATH = "/g/data2/rr5/vhl548/CPOL_PROD_1b/FIGURE_CHECK/"
+    # Output directory for log files.
     LOG_FILE_PATH = os.path.join(os.path.expanduser('~'), 'logfiles')
+    # Time in seconds for which each subprocess is allowed to live.
+    TIME_BEFORE_DEATH = 600 # seconds before killing process.
 
-    # Check if path exists.
+    # Check if paths exist.
     if not os.path.isdir(LOG_FILE_PATH):
         print("Creating log files directory: {}.".format(LOG_FILE_PATH))
         os.mkdir(LOG_FILE_PATH)
@@ -516,7 +534,7 @@ if __name__ == '__main__':
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         filename=log_file_name,
         filemode='a+')
-    gnrl_logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
 
     with warnings.catch_warnings():
         # Just ignoring warning messages.
