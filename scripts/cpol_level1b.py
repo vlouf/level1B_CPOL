@@ -321,7 +321,7 @@ def production_line(radar_file_name, outpath=None):
         print("WARNING: hail detection in Darwin. NOT POSSIBLE!", os.path.basename(outfilename))
         fout = os.path.join(os.path.expanduser('~'), "hail_detection.txt")
         with open(fout, "a+") as fid:
-            fid.writelines(os.path.basename(outfilename))
+            fid.write(os.path.basename(outfilename) + "\n")
 
     # Liquid/Ice Mass
     # We decided to not give these products.
@@ -336,7 +336,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Plot check figure.
     logger.info('Plotting figure')
-    plot_figure_check(radar, gatefilter, outfilename, radar_start_date, path_save_figure=FIGURE_CHECK_PATH)
+    plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
 
     # Rename fields and remove unnecessary ones.
     radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
