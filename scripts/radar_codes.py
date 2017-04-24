@@ -561,7 +561,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
                  'units' : 'degrees Celsius',
                  'comment': 'Radiosounding date: %s' % (radar_start_date.strftime("%Y/%m/%d"))}
 
-    # Calculte SNR
+    # Calculate SNR
     cnt = 1
     snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name)
     # Sometimes the SNR is an empty array, this is due to the toa parameter.

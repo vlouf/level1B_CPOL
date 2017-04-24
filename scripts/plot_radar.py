@@ -46,7 +46,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
 
     # Initializing figure.
     gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(6, 2, figsize=(10, 30), sharex=True, sharey=True)
+    fig, the_ax = pl.subplots(6, 2, figsize=(12, 30), sharex=True, sharey=True)
     the_ax = the_ax.flatten()
     # Plotting reflectivity
     gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
@@ -64,7 +64,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     gr.plot_ppi('VEL', ax = the_ax[6], cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
     gr.plot_ppi('VEL_UNFOLDED', ax = the_ax[7], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
 
-    gr.plot_ppi('SNR', ax = the_ax[8], cmap='OrRd')
+    gr.plot_ppi('SNR', ax = the_ax[8], cmap='OrRd', vmin=0, vmax=80)
     gr.plot_ppi('RHOHV', ax = the_ax[9], vmin=0, vmax=1, norm=colors.LogNorm(vmin=0.4, vmax=1), cmap='rainbow')
 
     gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='OrRd', vmin=-10, vmax=30)

@@ -4,8 +4,8 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 22/04/2017
-@version: 0.7
+@date: 24/04/2017
+@version: 0.8
 
 .. autosummary::
     :toctree: generated/
