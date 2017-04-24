@@ -389,7 +389,7 @@ if __name__ == '__main__':
     # Output directory for log files.
     LOG_FILE_PATH = "/short/kl02/vhl548/logfiles/"
     # Time in seconds for which each subprocess is allowed to live.
-    TIME_BEFORE_DEATH = 600 # seconds before killing process.
+    TIME_BEFORE_DEATH = 900 # seconds before killing process.
 
     # Check if paths exist.
     if not os.path.isdir(LOG_FILE_PATH):

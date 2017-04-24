@@ -10,6 +10,19 @@ import matplotlib.pyplot as pl
 import numpy as np
 
 
+def adjust_fhc_colorbar_for_pyart(cb):
+    """
+    adjust_fhc_colorbar_for_pyart
+    """
+    cb.set_ticks(np.arange(1.4, 10, 0.9))
+    cb.ax.set_yticklabels(['Drizzle', 'Rain', 'Ice Crystals', 'Aggregates',
+                           'Wet Snow', 'Vertical Ice', 'LD Graupel',
+                           'HD Graupel', 'Hail', 'Big Drops'])
+    cb.ax.set_ylabel('')
+    cb.ax.tick_params(length=0)
+    return cb
+
+
 def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     """
     Plot figure of old/new radar parameters for checking purpose.
@@ -69,7 +82,6 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
 
     gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='OrRd', vmin=-10, vmax=30)
     gr.plot_ppi('KDP', ax = the_ax[11], vmin=0, vmax=1, cmap='OrRd')
-    # gr.plot_ppi('LWC', ax = the_ax[11], norm=colors.LogNorm(vmin=0.01, vmax=10), gatefilter=gatefilter, cmap='YlOrRd')
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
@@ -79,5 +91,16 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
 
     pl.tight_layout()
     pl.savefig(outfile)  # Saving figure.
+    pl.close()
+
+    # HYDRO CLASSIFICATION
+    hid_colors = ['White', 'LightBlue', 'MediumBlue', 'DarkOrange', 'LightPink',
+                  'Cyan', 'DarkGray', 'Lime', 'Yellow', 'Red', 'Fuchsia']
+    cmaphid = colors.ListedColormap(hid_colors)
+
+    fig, ax0 = pl.subplots(1, 1, figsize = (6, 5))
+    gr.plot_ppi('HYDRO', vmin=0, vmax=10, cmap=cmaphid)
+    gr.cbs[-1] = adjust_fhc_colorbar_for_pyart(gr.cbs[-1])
+    pl.savefig(outfile.replace(".png", "_HYDROCLASS.png"))
 
     return None

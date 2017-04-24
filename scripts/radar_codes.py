@@ -98,7 +98,7 @@ def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
 
     rng2d, az2d = np.meshgrid(radar.range['data'], radar.azimuth['data'])
     dr = (r[1] - r[0])  # m
-    window_size = dr/1000*4 # in km!!!!!
+    window_size = dr/1000*4 # in km!!!
 
     kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d/1000.0, gs=dr, window=window_size, bad=-9999)
 
@@ -131,9 +131,16 @@ def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
     """
     kdp = kdp.filled(0)  # 0 is the neutral value for a sum
     kdp[kdp < 0] = 0
-    atten_specific = alpha*kdp
+    kdp[kdp > 1] = 0
+
+    atten_specific = alpha*kdp  # Bringi relationship
     atten_specific[np.isnan(atten_specific)] = 0
+    # Path integrated attenuation
     atten = 2 * np.cumsum(atten_specific, axis=1) * dr
+
+    if (atten > 10).sum() != 0:
+        print("WARNING: be carfull, risk of overestimating attenuation.")
+        print("Atten max is %f dB." % (atten.max()))
 
     return atten_specific, atten
 
@@ -401,8 +408,13 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
 
     hydro = np.argmax(scores, axis=0) + 1
     fill_value = -32768
-    hydro_data = np.ma.asanyarray(hydro)
-    hydro_data.mask = hydro_data == fill_value
+    hydro_data = np.ma.masked_where(hydro == fill_value, hydro)
+
+    if (hydro == 9).sum() != 0:
+        print("WARNING: hail detection in Darwin. NOT POSSIBLE!")
+        fout = os.path.join(os.path.expanduser('~'), "hail_detection.txt")
+        with open(fout, "a+") as fid:
+            fid.write(radar.metadata['history'] + "\n")
 
     the_comments = "1: Drizzle; 2: Rain; 3: Ice Crystals; 4: Aggregates; " +\
                    "5: Wet Snow; 6: Vertical Ice; 7: LD Graupel; 8: HD Graupel; 9: Hail; 10: Big Drops"
