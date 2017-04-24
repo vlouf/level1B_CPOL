@@ -12,8 +12,6 @@ CPOL Level 1b main production line.
 
     timeout_handler
     chunks
-    setup_logger
-    plot_figure_check
     check_azimuth
     production_line
     production_line_manager
@@ -34,8 +32,6 @@ from multiprocessing import Pool
 # Other Libraries -- Matplotlib must be imported first
 import matplotlib
 matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
-import matplotlib.colors as colors
-import matplotlib.pyplot as pl
 
 import pyart
 import netCDF4
@@ -44,6 +40,7 @@ import numpy as np
 import pandas as pd
 
 # Custom modules.
+import plot_radar
 import radar_codes
 import raijin_tools
 import gridding_codes
@@ -64,78 +61,6 @@ def chunks(l, n):
     """
     for i in range(0, len(l), n):
         yield l[i:i + n]
-
-
-def plot_figure_check(radar, gatefilter, outfilename, radar_date):
-    """
-    Plot figure of old/new radar parameters for checking purpose.
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        gatefilter:
-            The Gate filter.
-        outfilename: str
-            Name given to the output netcdf data file.
-        radar_date: datetime
-            Datetime stucture of the radar data.
-    """
-    # Extracting year and date.
-    year = str(radar_date.year)
-    datestr = radar_date.strftime("%Y%m%d")
-    # Path for saving Figures.
-    outfile_path = os.path.join(FIGURE_CHECK_PATH, year, datestr)
-
-    # Checking if output directory exists. Creating them otherwise.
-    if not os.path.isdir(os.path.join(FIGURE_CHECK_PATH, year)):
-        os.mkdir(os.path.join(FIGURE_CHECK_PATH, year))
-    if not os.path.isdir(outfile_path):
-        os.mkdir(outfile_path)
-
-    # Checking if figure already exists.
-    outfile = os.path.basename(outfilename)
-    outfile = outfile[:-2] + "png"
-    outfile = os.path.join(outfile_path, outfile)
-    if os.path.isfile(outfile):
-        logger.error('Figure for %s already exists', os.path.basename(outfile))
-        return None
-
-    # Initializing figure.
-    gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(6, 2, figsize=(10, 30), sharex=True, sharey=True)
-    the_ax = the_ax.flatten()
-    # Plotting reflectivity
-    gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
-    gr.plot_ppi('DBZ_CORR', ax = the_ax[1], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSRef, vmin=-10, vmax=70)
-
-    gr.plot_ppi('ZDR', ax = the_ax[2], vmin=-5, vmax=10)  # ZDR
-    gr.plot_ppi('ZDR_CORR', ax = the_ax[3], gatefilter=gatefilter, vmin=-5, vmax=10)
-
-    gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180, cmap='jet')
-    try:
-        gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='jet')
-    except KeyError:
-        gr.plot_ppi('PHIDP', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='jet')
-
-    gr.plot_ppi('VEL', ax = the_ax[6], cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
-    gr.plot_ppi('VEL_UNFOLDED', ax = the_ax[7], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
-
-    gr.plot_ppi('SNR', ax = the_ax[8])
-    gr.plot_ppi('RHOHV', ax = the_ax[9], vmin=0, vmax=1)
-
-    gr.plot_ppi('sounding_temperature', ax = the_ax[10], cmap='YlOrRd', vmin=-10, vmax=30)
-    gr.plot_ppi('KDP', ax = the_ax[11], vmin=-1, vmax=1)
-    # gr.plot_ppi('LWC', ax = the_ax[11], norm=colors.LogNorm(vmin=0.01, vmax=10), gatefilter=gatefilter, cmap='YlOrRd')
-
-    for ax_sl in the_ax:
-        gr.plot_range_rings([50, 100, 150], ax=ax_sl)
-        ax_sl.axis((-150, 150, -150, 150))
-
-    pl.tight_layout()
-    pl.savefig(outfile)  # Saving figure.
-
-    return None
 
 
 def check_azimuth(radar, radar_file_name):
@@ -309,9 +234,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Plot check figure.
     logger.info('Plotting figure')
-    plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
-    figure_time = time.time()
-    logger.info("Figure for %s plotted in %0.2f seconds.", os.path.basename(outfilename), (figure_time - end_time))
+    plot_radar.plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
 
     # Rename fields and remove unnecessary ones.
     radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
@@ -328,7 +251,7 @@ def production_line(radar_file_name, outpath=None):
     # Hardcode mask
     for mykey in radar.fields:
         if mykey in ['sounding_temperature', 'height', 'SNR', 'NCP', 'HYDRO']:
-            # Virgin fields that we leave untouched.
+            # Virgin fields that are left untouch.
             continue
         else:
             radar.fields[mykey]['data'] = radar_codes.filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
@@ -337,7 +260,7 @@ def production_line(radar_file_name, outpath=None):
     # Write results
     pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
     save_time = time.time()
-    logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (save_time - figure_time))
+    logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (save_time - end_time))
 
     # Gridding (and saving)
     gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=OUTPATH_GRID)

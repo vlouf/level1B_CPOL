@@ -38,10 +38,34 @@ import pyart
 import netCDF4
 import numpy as np
 
+from numba import jit, int32, float32
 from csu_radartools import csu_kdp, csu_liquid_ice_mass, csu_fhc
 
-# Personal import
-import phidp_codes
+
+@jit(nopython=True, cache=True)
+def _unfold_phidp(the_phidp, rpos, azipos):
+    """
+    Internally called by unfold_phidp_vdop()
+    """
+    tmp = the_phidp
+    for i, j in zip(azipos, rpos):
+        tmp[i, j:] += 180
+    return tmp
+
+
+@jit(cache=True)
+def _refold_vdop(vdop_art, v_nyq_vel, rpos, azipos):
+    """
+    Internally called by unfold_phidp_vdop()
+    """
+    tmp = vdop_art
+    for i, j in zip(azipos, rpos):
+        tmp[i, j:] += v_nyq_vel
+
+    pos = (vdop_art > v_nyq_vel)
+    tmp[pos] = tmp[pos] - 2*v_nyq_vel
+
+    return tmp
 
 
 def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
@@ -66,7 +90,6 @@ def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
         kdN: array
             KDP Bringi
     """
-
     refl = radar.fields[refl_name]['data']
     phidp = radar.fields[phidp_name]['data']
     refl = np.ma.masked_where(gatefilter.gate_excluded, refl).filled(-9999)
@@ -607,7 +630,7 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
         print("No posr found unfolding phidp")
         unfold_vel = False
     else:
-        phidp = phidp_codes.unfold_phidp(deepcopy(phidp), posr, posazi)
+        phidp = _unfold_phidp(deepcopy(phidp), posr, posazi)
         # Calculating the offset.
         tmp = deepcopy(phidp)
         tmp[tmp < 0]  = np.NaN
@@ -620,7 +643,7 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
 
     # Refold Doppler.
     if unfold_vel:
-        vdop_refolded = phidp_codes.refold_vdop(deepcopy(vdop), v_nyq_vel, posr, posazi)
+        vdop_refolded = _refold_vdop(deepcopy(vdop), v_nyq_vel, posr, posazi)
 
     return phidp_unfold, vdop_refolded
 
