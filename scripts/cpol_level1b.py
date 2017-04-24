@@ -163,7 +163,7 @@ def production_line(radar_file_name, outpath=None):
     logger.info('RHOHV corrected.')
 
     # Get filter
-    gatefilter = radar_codes.do_gatefilter(radar)
+    gatefilter = radar_codes.do_gatefilter(radar, rhohv_name='RHOHV_CORR')
     logger.info('Filter initialized.')
 
     # Correct ZDR

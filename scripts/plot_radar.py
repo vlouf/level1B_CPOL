@@ -47,8 +47,8 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, path_save_figu
     outfile_path = os.path.join(path_save_figure, year, datestr)
 
     # Checking if output directory exists. Creating them otherwise.
-    if not os.path.isdir(os.path.join(FIGURE_CHECK_PATH, year)):
-        os.mkdir(os.path.join(FIGURE_CHECK_PATH, year))
+    if not os.path.isdir(os.path.join(path_save_figure, year)):
+        os.mkdir(os.path.join(path_save_figure, year))
     if not os.path.isdir(outfile_path):
         os.mkdir(outfile_path)
 
