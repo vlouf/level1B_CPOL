@@ -410,12 +410,6 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     fill_value = -32768
     hydro_data = np.ma.masked_where(hydro == fill_value, hydro)
 
-    if (hydro == 9).sum() != 0:
-        print("WARNING: hail detection in Darwin. NOT POSSIBLE!")
-        fout = os.path.join(os.path.expanduser('~'), "hail_detection.txt")
-        with open(fout, "a+") as fid:
-            fid.write(radar.metadata['history'] + "\n")
-
     the_comments = "1: Drizzle; 2: Rain; 3: Ice Crystals; 4: Aggregates; " +\
                    "5: Wet Snow; 6: Vertical Ice; 7: LD Graupel; 8: HD Graupel; 9: Hail; 10: Big Drops"
 
@@ -584,6 +578,9 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         # Break after the fifth attempt.
         if cnt > 5:
             break
+
+    if snr['data'].count == 0:
+        raise ValueError('Impossible to compute SNR')
 
     return z_dict, temp_info_dict, snr
 
