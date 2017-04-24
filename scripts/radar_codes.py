@@ -268,7 +268,7 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV', ncp_name='NCP'):
     try:
         # NCP field is not present for older seasons.
         radar.fields[ncp_name]
-        gf.exclude_below(ncp_name, 0.5)
+        gf.exclude_below(ncp_name, 0.3)
     except KeyError:
         pass
 
