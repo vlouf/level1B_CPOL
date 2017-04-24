@@ -23,7 +23,7 @@ def adjust_fhc_colorbar_for_pyart(cb):
     return cb
 
 
-def plot_figure_check(radar, gatefilter, outfilename, radar_date):
+def plot_figure_check(radar, gatefilter, outfilename, radar_date, path_save_figure=None):
     """
     Plot figure of old/new radar parameters for checking purpose.
 
@@ -38,11 +38,13 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
         radar_date: datetime
             Datetime stucture of the radar data.
     """
+    if path_save_figure is None:
+        path_save_figure = "/g/data2/rr5/vhl548/CPOL_PROD_1b/FIGURE_CHECK/"
     # Extracting year and date.
     year = str(radar_date.year)
     datestr = radar_date.strftime("%Y%m%d")
     # Path for saving Figures.
-    outfile_path = os.path.join(FIGURE_CHECK_PATH, year, datestr)
+    outfile_path = os.path.join(path_save_figure, year, datestr)
 
     # Checking if output directory exists. Creating them otherwise.
     if not os.path.isdir(os.path.join(FIGURE_CHECK_PATH, year)):

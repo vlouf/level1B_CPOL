@@ -86,7 +86,7 @@ def check_azimuth(radar, radar_file_name):
     minazi = np.min(azi)
 
     if np.abs(maxazi - minazi) < 60:
-        is_good = False        
+        is_good = False
         # Keeping track of bad files:
         # badfile = os.path.join(os.path.expanduser('~'), 'bad_radar_azimuth.txt')
         # with open(badfile, 'a+') as fid:
@@ -235,7 +235,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Plot check figure.
     logger.info('Plotting figure')
-    plot_radar.plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
+    plot_radar.plot_figure_check(radar, gatefilter, outfilename, radar_start_date, path_save_figure=FIGURE_CHECK_PATH)
 
     # Rename fields and remove unnecessary ones.
     radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
