@@ -242,7 +242,11 @@ def production_line(radar_file_name, outpath=None):
         refold_velocity = False
 
     # Compute SNR
-    height, temperature, snr = radar_codes.snr_and_sounding(radar, SOUND_DIR, 'DBZ')
+    try:
+        height, temperature, snr = radar_codes.snr_and_sounding(radar, SOUND_DIR, 'DBZ')
+    except ValueError:
+        logger.error("Impossible to compute SNR")
+        return None
     radar.add_field('sounding_temperature', temperature, replace_existing = True)
     radar.add_field('height', height, replace_existing = True)
     try:

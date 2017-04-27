@@ -578,6 +578,9 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name, toa=15000)
 
     if snr['data'].count() == 0:
+        snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name, toa=10000)
+    
+    if snr['data'].count() == 0:
         raise ValueError('Impossible to compute SNR')
 
     return z_dict, temp_info_dict, snr
