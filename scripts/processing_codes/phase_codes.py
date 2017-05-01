@@ -183,6 +183,12 @@ def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHO
         LP_solver='pyglpk', refl_field=refl_field, ncp_field=ncp_field,
         rhv_field=rhv_field, phidp_field=phidp_field, kdp_field=kdp_field)
 
+    # Check if phidp_gg and kdp_gg are masked array.
+    if not np.ma.isMaskedArray(phidp_gg['data']):
+        phidp_gg['data'] = np.ma.masked_array(phidp_gg['data'])
+    if not np.ma.isMaskedArray(kdp_gg['data']):
+        kdp_gg['data'] = np.ma.masked_array(kdp_gg['data'])
+
     return phidp_gg, kdp_gg
 
 

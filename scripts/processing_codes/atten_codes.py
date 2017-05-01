@@ -30,7 +30,12 @@ def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
         atten: array
             Cumulated attenuation (dB)
     """
-    kdp = kdp.filled(0)  # 0 is the neutral value for a sum
+    # Check if KDP is a masked array.
+    if np.ma.isMaskedArray(kdp):
+        kdp = kdp.filled(0)  # 0 is the neutral value for a sum
+    else:
+        kdp[np.isnan(kdp)] = 0
+
     kdp[:, :-40] = 0  # Removing the last gates because of artifacts created by the SOBEL window.
     kdp[kdp < 0] = 0
     kdp[kdp > 5] = 0
