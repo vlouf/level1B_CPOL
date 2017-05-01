@@ -12,9 +12,6 @@ Codes for correcting and estimating various radar and meteorological parameters.
     _unfold_phidp
     _refold_vdop
     bringi_phidp_kdp
-    compute_attenuation
-    correct_attenuation_zdr
-    correct_attenuation_zh
     correct_rhohv
     correct_zdr
     do_gatefilter
@@ -42,188 +39,60 @@ import pyart
 import netCDF4
 import numpy as np
 
-from numba import jit, int32, float32
-from csu_radartools import csu_kdp, csu_liquid_ice_mass, csu_fhc
+from csu_radartools import csu_liquid_ice_mass, csu_fhc
 
 
-@jit(nopython=True, cache=True)
-def _unfold_phidp(the_phidp, rpos, azipos):
+def _nearest(items, pivot):
     """
-    Internally called by unfold_phidp_vdop()
-    """
-    tmp = the_phidp
-    for i, j in zip(azipos, rpos):
-        tmp[i, j:] += 180
-    return tmp
-
-
-@jit(cache=True)
-def _refold_vdop(vdop_art, v_nyq_vel, rpos, azipos):
-    """
-    Internally called by unfold_phidp_vdop()
-    """
-    tmp = vdop_art
-    for i, j in zip(azipos, rpos):
-        tmp[i, j:] += v_nyq_vel
-
-    pos = (vdop_art > v_nyq_vel)
-    tmp[pos] = tmp[pos] - 2*v_nyq_vel
-
-    return tmp
-
-
-def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
-    """
-    Compute PHIDP and KDP using Bringi's algorithm.
+    Find the nearest item.
 
     Parameters:
     ===========
-        radar:
-            Py-ART radar structure
-        gatefilter:
-            Radar GateFilter (excluding bad data).
-        refl_name: str
-            Reflectivity field name
-        phidp_name: str
-            PHIDP field name
+        items:
+            List of item.
+        pivot:
+            Item we're looking for.
 
     Returns:
     ========
-        fdN: array
-            PhiDP Bringi
-        kdN: array
-            KDP Bringi
+        item:
+            Value of the nearest item found.
     """
-    refl = radar.fields[refl_name]['data']
-    phidp = radar.fields[phidp_name]['data']
-    refl = np.ma.masked_where(gatefilter.gate_excluded, refl).filled(-9999)
-    phidp = np.ma.masked_where(gatefilter.gate_excluded, phidp).filled(-9999)
-    r = radar.range['data']
-
-    rng2d, az2d = np.meshgrid(radar.range['data'], radar.azimuth['data'])
-    dr = (r[1] - r[0])  # m
-    window_size = dr/1000*4 # in km!!!
-
-    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d/1000.0, gs=dr,
-        window=window_size, bad=-9999)
-
-    fdN = np.ma.masked_where(fdN == -9999, fdN)
-    kdN = np.ma.masked_where(kdN == -9999, kdN)
-
-    return fdN, kdN
+    return min(items, key=lambda x: abs(x - pivot))
 
 
-def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
+def check_azimuth(radar, radar_file_name):
     """
-    Alpha is defined by Ah=alpha*Kdp, beta is defined by Ah-Av=beta*Kdp.
-    From Bringi et al. (2003)
-
-    Parameters:
-    ===========
-        kdp: array
-            Specific phase.
-        alpha: float
-            Parameter being defined by Ah = alpha*Kdp
-        dr: float
-            Gate range in km.
-
-    Returns:
-    ========
-        atten_specific: array
-            Specfific attenuation (dB/km)
-        atten: array
-            Cumulated attenuation (dB)
-    """
-    kdp = kdp.filled(0)  # 0 is the neutral value for a sum
-    kdp[:, :-40] = 0  # Removing the last gates because of artifacts created by the SOBEL window.
-    kdp[kdp < 0] = 0
-    kdp[kdp > 5] = 0
-
-    atten_specific = alpha*kdp  # Bringi relationship
-    atten_specific[np.isnan(atten_specific)] = 0
-    # Path integrated attenuation
-    atten = 2 * np.cumsum(atten_specific, axis=1) * dr
-
-    if (atten > 10).sum() != 0:
-        print("WARNING: be carfull, risk of overestimating attenuation.")
-        print("Atten max is %f dB." % (atten.max()))
-
-    return atten_specific, atten
-
-
-def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP_GG'):
-    """
-    Correct attenuation on differential reflectivity. KDP_GG has been
-    cleaned of noise, that's why we use it.
+    Checking if radar has a proper azimuth field.  It's a minor problem
+    concerning less than 7 days in the entire dataset.
 
     Parameters:
     ===========
         radar:
             Py-ART radar structure.
-        zdr_name: str
-            Differential reflectivity field name.
-        kdp_name: str
-            KDP field name.
+        radar_file_name: str
+            Name of the input radar file.
 
-    Returns:
-    ========
-        atten_meta: dict
-            Specific attenuation.
-        zdr_corr: array
-            Attenuation corrected differential reflectivity.
+    Return:
+    =======
+        is_good: bool
+            True if radar has a proper azimuth field.
     """
-    r = radar.range['data']
-    zdr = radar.fields[zdr_name]['data']
-    kdp = radar.fields[kdp_name]['data']
+    is_good = True
+    azi = radar.azimuth['data']
+    maxazi = np.max(azi)
+    minazi = np.min(azi)
 
-    dr = (r[1] - r[0]) / 1000  # km
+    if np.abs(maxazi - minazi) < 60:
+        is_good = False
+        # Keeping track of bad files:
+        # badfile = os.path.join(os.path.expanduser('~'), 'bad_radar_azimuth.txt')
+        # with open(badfile, 'a+') as fid:
+        #     fid.write(radar_file_name + "\n")
 
-    atten_spec, atten = compute_attenuation(kdp, alpha=0.016, dr=dr)
-    zdr_corr = zdr + atten
+    return is_good
 
-    atten_meta = {'data': atten_spec, 'units': 'dB/km',
-                  'standard_name': 'specific_attenuation_zdr',
-                  'long_name': 'Differential reflectivity specific attenuation'}
-
-    return atten_meta, zdr_corr
-
-
-def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_GG'):
-    """
-    Correct attenuation on reflectivity. KDP_GG has been
-    cleaned of noise, that's why we use it.
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        refl_name: str
-            Reflectivity field name.
-        kdp_name: str
-            KDP field name.
-
-    Returns:
-    ========
-        atten_meta: dict
-            Specific attenuation.
-        zh_corr: array
-            Attenuation corrected reflectivity.
-    """
-    r = radar.range['data']
-    refl = radar.fields[refl_name]['data']
-    kdp = radar.fields[kdp_name]['data']
-
-    dr = (r[1] - r[0]) / 1000  # km
-
-    atten_spec, atten = compute_attenuation(kdp, alpha=0.08, dr=dr)
-    zh_corr = refl + atten
-
-    atten_meta = {'data': atten_spec, 'units': 'dB/km', 'standard_name': 'specific_attenuation_zh',
-                  'long_name': 'Reflectivity specific attenuation'}
-
-    return atten_meta, zh_corr
-
-
+    
 def correct_rhohv(radar, rhohv_name='RHOHV', snr_name='SNR'):
     """
     Correct cross correlation ratio (RHOHV) from noise. From the Schuur et al.
@@ -314,41 +183,6 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV', ncp_name='NCP'):
     return gf_despeckeld
 
 
-def estimate_kdp(radar, gatefilter, phidp_name='PHIDP'):
-    """
-    Estimate KDP.
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        gatefilter:
-            Radar GateFilter (excluding bad data).
-        phidp_name: str
-            PHIDP field name.
-
-    Returns:
-    ========
-        kdp_field: dict
-            KDP.
-    """
-    r = radar.range['data']
-    dr = (r[1] - r[0]) / 1000  # km
-
-    # The next two lines are 3 step:
-    # - Extracting PHIDP (it is a masked array)
-    # - Masking gates in PHIDP that are excluded by the gatefilter
-    # - Turning PHIDP into a normal array and filling all masked value to NaN.
-    phidp = radar.fields[phidp_name]['data']
-    phidp = np.ma.masked_where(gatefilter.gate_excluded, phidp).filled(np.NaN)
-
-    kdp_data = kdp_from_phidp_finitediff(phidp, dr=dr)
-    kdp_field = {'data': kdp_data, 'units': 'degrees/km', 'standard_name': 'specific_differential_phase_hv',
-                 'long_name': 'Specific differential phase (KDP)'}
-
-    return kdp_field
-
-
 def filter_hardcoding(my_array, nuke_filter, bad=-9999):
     """
     Harcoding GateFilter into an array.
@@ -427,32 +261,6 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     return hydro_meta
 
 
-def kdp_from_phidp_finitediff(phidp, L=7, dr=1.):
-    """
-    Retrieves KDP from PHIDP by applying a moving window range finite
-    difference derivative. Function from wradlib.
-
-    Parameters
-    ----------
-    phidp : multi-dimensional array
-        Note that the range dimension must be the last dimension of
-        the input array.
-    L : integer
-        Width of the window (as number of range gates)
-    dr : gate length in km
-    """
-
-    assert (L % 2) == 1, \
-        "Window size N for function kdp_from_phidp must be an odd number."
-    # Make really sure L is an integer
-    L = int(L)
-    kdp = np.zeros(phidp.shape)
-    for r in range(int(L / 2), phidp.shape[-1] - int(L / 2)):
-        kdp[..., r] = (phidp[..., r + int(L / 2)] -
-                       phidp[..., r - int(L / 2)]) / (L - 1)
-    return kdp / 2. / dr
-
-
 def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                     temperature_name='sounding_temperature', height_name='height'):
     """
@@ -492,74 +300,6 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                 'standard_name': 'ice_water_content'}
 
     return liquid_water_mass, ice_mass
-
-
-def nearest(items, pivot):
-    """
-    Find the nearest item.
-
-    Parameters:
-    ===========
-        items:
-            List of item.
-        pivot:
-            Item we're looking for.
-
-    Returns:
-    ========
-        item:
-            Value of the nearest item found.
-    """
-    return min(items, key=lambda x: abs(x - pivot))
-
-
-def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHOHV', phidp_field='PHIDP', kdp_field='KDP'):
-    """
-    Phase processing using the LP method in Py-ART. A LP solver is required,
-    I only have pyglpk and cvxopt, that's why I'm specifying it while calling
-    pyart.correct.phase_proc_lp.
-
-    Parameters:
-    ===========
-        myradar:
-            Py-ART radar structure.
-        refl_field: str
-            Reflectivity field name.
-        ncp_field: str
-            Normalised coherent power field name.
-        rhv_field: str
-            Cross correlation ration field name.
-        phidp_field: str
-            Phase field name.
-        kdp_field: str
-            Specific phase field name.
-
-    Returns:
-    ========
-        phidp_gg: dict
-            Field dictionary containing processed differential phase shifts.
-        kdp_gg: dict
-            Field dictionary containing recalculated differential phases.
-    """
-    # Check if NCP field exist.
-    try:
-        myradar.fields['NCP']
-        radar = myradar
-    except KeyError:
-        # Create NCP field. The radar=deepcopy(myradar) is here so that the
-        # "fake" NCP field we're adding is temporary, i.e. it is not added to
-        # the 'main' radar stucture but just a copy of it that will disappear
-        # when this function returns.
-        radar = deepcopy(myradar)
-        tmp = np.zeros_like(radar.fields[rhv_field]['data']) + 1
-        radar.add_field_like(rhv_field, ncp_field, tmp)  # Adding a fake NCP field.
-
-    # I don't have CYLP on Raijin, I need to use pyglpk.
-    phidp_gg, kdp_gg = pyart.correct.phase_proc_lp(radar, 0.0,
-        LP_solver='pyglpk', refl_field=refl_field, ncp_field=ncp_field,
-        rhv_field=rhv_field, phidp_field=phidp_field, kdp_field=kdp_field)
-
-    return phidp_gg, kdp_gg
 
 
 def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
@@ -605,7 +345,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         # closest date.
         print("Sounding file not found, looking for the nearest date.")
         dtime = [datetime.datetime.strptime(dt, 'YPDN_%Y%m%d_%H.nc') for dt in all_sonde_files]
-        closest_date = nearest(dtime, radar_start_date)
+        closest_date = _nearest(dtime, radar_start_date)
         sonde_pattern = datetime.datetime.strftime(closest_date, 'YPDN_%Y%m%d*')
         radar_start_date = closest_date
         sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
@@ -639,92 +379,9 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name, toa=10000)
 
     if snr['data'].count() == 0:
-        raise ValueError('Impossible to compute SNR')
+        pseudo_power = (radar.fields[refl_field]['data'] - 20.0*np.log10(range_grid / 1000.0))
 
     return z_dict, temp_info_dict, snr
-
-
-def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI',
-                      vel_name='VEL', unfold_vel=False):
-    """
-    Unfold PHIDP and refold Doppler velocity.
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        kdp_name:
-            KDP field name.
-        phidp_name: str
-            PHIDP field name.
-        vel_name: str
-            VEL field name.
-        unfold_vel: bool
-            Switch the Doppler velocity refolding
-
-    Returns:
-    ========
-        phidp_unfold: dict
-            Unfolded PHIDP.
-        vdop_refolded: dict
-            Refolded Doppler velocity.
-    """
-    # Initialize returns
-    phidp_unfold = None
-    vdop_refolded = None
-
-    # Extract data
-    phidp = radar.fields[phidp_name]['data']
-    phidp_bringi = radar.fields[phidp_bringi_name]['data'].filled(np.NaN)
-    vdop = radar.fields[vel_name]['data'].filled(np.NaN)
-    try:
-        v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
-    except:
-        v_nyq_vel = np.max(np.abs(vdop))
-
-    # Create gatefilter on PHIDP Bringi (the unfolding is based upon PHIDP Bringi)
-    gf = pyart.filters.GateFilter(radar)
-    gf.exclude_masked(phidp_bringi_name)
-
-    # Looking for folded area of PHIDP
-    [beam, ray] = np.where(phidp_bringi < 0)
-    print("Found {} negative values".format(len(beam)))
-    apos = np.unique(beam)
-    # Excluding the first 20 km.
-    ray[ray <= 80] = 9999
-    # Initializing empty array.
-    posr = []
-    posazi = []
-    for onebeam in apos:
-        # We exclude "noise" value by only taking into account beams that have a
-        # significant amount of negative values (e.g. 5).
-        if len(beam[beam == onebeam]) < 5:
-            continue
-        else:
-            posr.append(np.nanmin(ray[beam == onebeam]))
-            posazi.append(onebeam)
-
-    # If there is no folding, Doppler does not have to be corrected.
-    if len(posr) == 0:
-        print("No posr found unfolding phidp")
-        unfold_vel = False
-    else:
-        phidp = _unfold_phidp(deepcopy(phidp), posr, posazi)
-        # Calculating the offset.
-        tmp = deepcopy(phidp)
-        tmp[tmp < 0]  = np.NaN
-        phidp_offset = np.nanmean(np.nanmin(tmp, axis=1))
-        if phidp_offset < 0 or phidp_offset > 90:
-            # Offset too big or too low to be true, therefore it is not applied.
-            phidp_unfold = phidp
-        else:
-            phidp_unfold = phidp - phidp_offset
-
-    # Refold Doppler.
-    if unfold_vel:
-        vdop_refolded = _refold_vdop(deepcopy(vdop), v_nyq_vel, posr, posazi)
-
-    return phidp_unfold, vdop_refolded
 
 
 def unfold_velocity(radar, my_gatefilter, bobby_params=True, vel_name='VEL'):

@@ -42,9 +42,11 @@ import numpy as np
 import pandas as pd
 
 # Custom modules.
-import radar_codes
-import raijin_tools
-import gridding_codes
+from processing_codes import radar_codes
+from processing_codes import atten_codes
+from processing_codes import phase_codes
+from processing_codes import raijin_tools
+from processing_codes import gridding_codes
 
 
 class TimeoutException(Exception):   # Custom exception class
@@ -158,38 +160,6 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     return None
 
 
-def check_azimuth(radar, radar_file_name):
-    """
-    Checking if radar has a proper azimuth field.  It's a minor problem
-    concerning less than 7 days in the entire dataset.
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        radar_file_name: str
-            Name of the input radar file.
-
-    Return:
-    =======
-        is_good: bool
-            True if radar has a proper azimuth field.
-    """
-    is_good = True
-    azi = radar.azimuth['data']
-    maxazi = np.max(azi)
-    minazi = np.min(azi)
-
-    if np.abs(maxazi - minazi) < 60:
-        is_good = False
-        # Keeping track of bad files:
-        # badfile = os.path.join(os.path.expanduser('~'), 'bad_radar_azimuth.txt')
-        # with open(badfile, 'a+') as fid:
-        #     fid.write(radar_file_name + "\n")
-
-    return is_good
-
-
 def production_line(radar_file_name, outpath=None):
     """
     Production line for correcting and estimating CPOL data radar parameters.
@@ -225,7 +195,7 @@ def production_line(radar_file_name, outpath=None):
         return None
 
     # Check if radar is correct.
-    if not check_azimuth(radar, radar_file_name):
+    if not radar_codes.check_azimuth(radar, radar_file_name):
         logger.error("MAJOR ERROR: %s does not have a proper azimuth.", radar_file_name)
         return None
 
@@ -243,7 +213,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Compute SNR
     try:
-        height, temperature, snr = radar_codes.snr_and_sounding(radar, SOUND_DIR, 'DBZ')
+        height, temperature, snr = radar_codes.snr_and_sounding(radar, SOUND_DIR)
     except ValueError:
         logger.error("Impossible to compute SNR")
         return None
@@ -275,19 +245,19 @@ def production_line(radar_file_name, outpath=None):
         logger.info('KDP already exists')
     except KeyError:
         logger.info('We need to estimate KDP')
-        kdp_con = radar_codes.estimate_kdp(radar, gatefilter)
+        kdp_con = phase_codes.estimate_kdp(radar, gatefilter)
         radar.add_field('KDP', kdp_con, replace_existing=True)
         logger.info('KDP estimated.')
 
     # Giangrande PHIDP/KDP
-    phidp_gg, kdp_gg = radar_codes.phidp_giangrande(radar)
+    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar)
     radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
     radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
     radar.fields['PHIDP_GG']['long_name'] = "giangrande_" + radar.fields['PHIDP_GG']['long_name']
     radar.fields['KDP_GG']['long_name'] = "giangrande_" + radar.fields['KDP_GG']['long_name']
 
     # Bringi PHIDP/KDP
-    phidp_bringi, kdp_bringi = radar_codes.bringi_phidp_kdp(radar, gatefilter)
+    phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter)
     radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
     # Correcting PHIDP and KDP Bringi's attributes.
@@ -296,7 +266,7 @@ def production_line(radar_file_name, outpath=None):
     logger.info('KDP/PHIDP Bringi estimated.')
 
     # Unfold PHIDP, refold VELOCITY
-    phidp_unfold, vdop_refolded = radar_codes.unfold_phidp_vdop(radar, unfold_vel=refold_velocity)
+    phidp_unfold, vdop_refolded = phase_codes.unfold_phidp_vdop(radar, unfold_vel=refold_velocity)
     if phidp_unfold is not None:
         logger.info('PHIDP has been unfolded.')
         radar.add_field_like('PHIDP', 'PHIDP_CORR', phidp_unfold, replace_existing=True)
@@ -312,13 +282,13 @@ def production_line(radar_file_name, outpath=None):
     logger.info('Doppler velocity unfolded.')
 
     # Correct Attenuation ZH
-    atten_spec, zh_corr = radar_codes.correct_attenuation_zh(radar)
+    atten_spec, zh_corr = atten_codes.correct_attenuation_zh(radar)
     radar.add_field_like('DBZ', 'DBZ_CORR', zh_corr, replace_existing=True)
     radar.add_field('specific_attenuation_zh', atten_spec, replace_existing=True)
     logger.info('Attenuation on reflectivity corrected.')
 
     # Correct Attenuation ZDR
-    atten_spec_zdr, zdr_corr = radar_codes.correct_attenuation_zdr(radar)
+    atten_spec_zdr, zdr_corr = atten_codes.correct_attenuation_zdr(radar)
     radar.add_field_like('ZDR', 'ZDR_CORR', zdr_corr, replace_existing=True)
     radar.add_field('specific_attenuation_zdr', atten_spec_zdr, replace_existing=True)
     logger.info('Attenuation on ZDR corrected.')
