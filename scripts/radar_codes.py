@@ -9,17 +9,21 @@ Codes for correcting and estimating various radar and meteorological parameters.
 .. autosummary::
     :toctree: generated/
 
+    _unfold_phidp
+    _refold_vdop
     bringi_phidp_kdp
     compute_attenuation
     correct_attenuation_zdr
     correct_attenuation_zh
     correct_rhohv
     correct_zdr
+    do_gatefilter
     estimate_kdp
     hydrometeor_classification
     kdp_from_phidp_finitediff
     liquid_ice_mass
     nearest
+    phidp_giangrande
     snr_and_sounding
     unfold_phidp_vdop
     unfold_velocity
@@ -100,7 +104,8 @@ def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
     dr = (r[1] - r[0])  # m
     window_size = dr/1000*4 # in km!!!
 
-    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d/1000.0, gs=dr, window=window_size, bad=-9999)
+    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d/1000.0, gs=dr,
+        window=window_size, bad=-9999)
 
     fdN = np.ma.masked_where(fdN == -9999, fdN)
     kdN = np.ma.masked_where(kdN == -9999, kdN)
@@ -130,8 +135,9 @@ def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
             Cumulated attenuation (dB)
     """
     kdp = kdp.filled(0)  # 0 is the neutral value for a sum
+    kdp[:, :-40] = 0  # Removing the last gates because of artifacts created by the SOBEL window.
     kdp[kdp < 0] = 0
-    kdp[kdp > 1] = 0
+    kdp[kdp > 5] = 0
 
     atten_specific = alpha*kdp  # Bringi relationship
     atten_specific[np.isnan(atten_specific)] = 0
@@ -145,9 +151,9 @@ def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
     return atten_specific, atten
 
 
-def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP_BRINGI'):
+def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP_GG'):
     """
-    Correct attenuation on differential reflectivity. KDP_BRINGI has been
+    Correct attenuation on differential reflectivity. KDP_GG has been
     cleaned of noise, that's why we use it.
 
     Parameters:
@@ -175,15 +181,16 @@ def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP_BRINGI'):
     atten_spec, atten = compute_attenuation(kdp, alpha=0.016, dr=dr)
     zdr_corr = zdr + atten
 
-    atten_meta = {'data': atten_spec, 'units': 'dB/km', 'standard_name': 'specific_attenuation_zdr',
+    atten_meta = {'data': atten_spec, 'units': 'dB/km',
+                  'standard_name': 'specific_attenuation_zdr',
                   'long_name': 'Differential reflectivity specific attenuation'}
 
     return atten_meta, zdr_corr
 
 
-def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_BRINGI'):
+def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_GG'):
     """
-    Correct attenuation on reflectivity. KDP_BRINGI has been
+    Correct attenuation on reflectivity. KDP_GG has been
     cleaned of noise, that's why we use it.
 
     Parameters:
@@ -404,7 +411,8 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     radar_T = radar.fields[temperature_name]['data']
     radar_z = radar.fields[height_name]['data']
 
-    scores = csu_fhc.csu_fhc_summer(dz=refl, zdr=zdr, rho=rhohv, kdp=kdp, use_temp=True, band='C', T=radar_T)
+    scores = csu_fhc.csu_fhc_summer(dz=refl, zdr=zdr, rho=rhohv, kdp=kdp,
+        use_temp=True, band='C', T=radar_T)
 
     hydro = np.argmax(scores, axis=0) + 1
     fill_value = -32768
@@ -475,7 +483,8 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     radar_T = radar.fields[temperature_name]['data']
     radar_z = radar.fields[height_name]['data']
 
-    liquid_water_mass, ice_mass = csu_liquid_ice_mass.calc_liquid_ice_mass(refl, zdr, radar_z/1000, T=radar_T, method='cifelli')
+    liquid_water_mass, ice_mass = csu_liquid_ice_mass.calc_liquid_ice_mass(refl,
+        zdr, radar_z/1000, T=radar_T, method='cifelli')
 
     liquid_water_mass = {'data': liquid_water_mass, 'units': 'g m-3', 'long_name': \
                          'Liquid Water Content', 'standard_name': 'liquid_water_content'}
@@ -502,6 +511,55 @@ def nearest(items, pivot):
             Value of the nearest item found.
     """
     return min(items, key=lambda x: abs(x - pivot))
+
+
+def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHOHV', phidp_field='PHIDP', kdp_field='KDP'):
+    """
+    Phase processing using the LP method in Py-ART. A LP solver is required,
+    I only have pyglpk and cvxopt, that's why I'm specifying it while calling
+    pyart.correct.phase_proc_lp.
+
+    Parameters:
+    ===========
+        myradar:
+            Py-ART radar structure.
+        refl_field: str
+            Reflectivity field name.
+        ncp_field: str
+            Normalised coherent power field name.
+        rhv_field: str
+            Cross correlation ration field name.
+        phidp_field: str
+            Phase field name.
+        kdp_field: str
+            Specific phase field name.
+
+    Returns:
+    ========
+        phidp_gg: dict
+            Field dictionary containing processed differential phase shifts.
+        kdp_gg: dict
+            Field dictionary containing recalculated differential phases.
+    """
+    # Check if NCP field exist.
+    try:
+        myradar.fields['NCP']
+        radar = myradar
+    except KeyError:
+        # Create NCP field. The radar=deepcopy(myradar) is here so that the
+        # "fake" NCP field we're adding is temporary, i.e. it is not added to
+        # the 'main' radar stucture but just a copy of it that will disappear
+        # when this function returns.
+        radar = deepcopy(myradar)
+        tmp = np.zeros_like(radar.fields[rhv_field]['data']) + 1
+        radar.add_field_like(rhv_field, ncp_field, tmp)  # Adding a fake NCP field.
+
+    # I don't have CYLP on Raijin, I need to use pyglpk.
+    phidp_gg, kdp_gg = pyart.correct.phase_proc_lp(radar, 0.0,
+        LP_solver='pyglpk', refl_field=refl_field, ncp_field=ncp_field,
+        rhv_field=rhv_field, phidp_field=phidp_field, kdp_field=kdp_field)
+
+    return phidp_gg, kdp_gg
 
 
 def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
@@ -579,7 +637,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
 
     if snr['data'].count() == 0:
         snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name, toa=10000)
-    
+
     if snr['data'].count() == 0:
         raise ValueError('Impossible to compute SNR')
 
