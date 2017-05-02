@@ -180,7 +180,7 @@ def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHO
 
     # I don't have CYLP on Raijin, I need to use pyglpk.
     phidp_gg, kdp_gg = pyart.correct.phase_proc_lp(radar, 0.0,
-        LP_solver='pyglpk', refl_field=refl_field, ncp_field=ncp_field,
+        LP_solver='cylp', refl_field=refl_field, ncp_field=ncp_field,
         rhv_field=rhv_field, phidp_field=phidp_field, kdp_field=kdp_field)
 
     # Check if phidp_gg and kdp_gg are masked array.

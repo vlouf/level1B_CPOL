@@ -470,7 +470,7 @@ if __name__ == '__main__':
     # Output directory for verification figures.
     FIGURE_CHECK_PATH = os.path.join(OUTPATH, 'FIGURE_CHECK')
     # Output directory for log files.
-    LOG_FILE_PATH = "/short/rr5/vhl548/logfiles/"
+    LOG_FILE_PATH = "/short/kl02/vhl548/logfiles/"
     # Time in seconds for which each subprocess is allowed to live.
     TIME_BEFORE_DEATH = 1200 # seconds before killing process.
 
