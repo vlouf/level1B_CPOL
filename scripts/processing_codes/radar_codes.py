@@ -43,11 +43,29 @@ from csu_radartools import csu_liquid_ice_mass, csu_fhc
 
 
 def _my_snr_from_reflectivity(radar, refl_field='DBZ'):
+    """
+    Just in case pyart.retrieve.calculate_snr_from_reflectivity, I can calculate
+    it 'by hand'.
+    Parameter:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_field_name: str
+            Name of the reflectivity field.
+
+    Return:
+    =======
+        snr: dict
+            Signal to noise ratio.
+
+    """
     range_grid, azi_grid = np.meshgrid(radar.range['data'], radar.azimuth['data'])
     range_grid += 1  # Cause of 0
 
     # remove range scale.. This is basically the radar constant scaled dBm
     pseudo_power = (radar.fields[refl_field]['data'] - 20.0*np.log10(range_grid / 1000.0))
+    # The noise_floor_estimate can fail sometimes in pyart, that's the reason
+    # why this whole function exists.
     noise_floor_estimate = -40
 
     snr_field = pyart.config.get_field_name('signal_to_noise_ratio')
