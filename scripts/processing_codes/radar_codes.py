@@ -42,6 +42,21 @@ import numpy as np
 from csu_radartools import csu_liquid_ice_mass, csu_fhc
 
 
+def _my_snr_from_reflectivity(radar, refl_field='DBZ'):
+    range_grid, azi_grid = np.meshgrid(radar.range['data'], radar.azimuth['data'])
+    range_grid += 1  # Cause of 0
+
+    # remove range scale.. This is basically the radar constant scaled dBm
+    pseudo_power = (radar.fields[refl_field]['data'] - 20.0*np.log10(range_grid / 1000.0))
+    noise_floor_estimate = -40
+
+    snr_field = pyart.config.get_field_name('signal_to_noise_ratio')
+    snr_dict = pyart.config.get_metadata(snr_field)
+    snr_dict['data'] = pseudo_power - noise_floor_estimate
+
+    return snr_dict
+
+
 def _nearest(items, pivot):
     """
     Find the nearest item.
@@ -61,17 +76,15 @@ def _nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
 
-def check_azimuth(radar, radar_file_name):
+def check_azimuth(radar):
     """
     Checking if radar has a proper azimuth field.  It's a minor problem
     concerning less than 7 days in the entire dataset.
 
-    Parameters:
+    Parameter:
     ===========
         radar:
             Py-ART radar structure.
-        radar_file_name: str
-            Name of the input radar file.
 
     Return:
     =======
@@ -85,14 +98,38 @@ def check_azimuth(radar, radar_file_name):
 
     if np.abs(maxazi - minazi) < 60:
         is_good = False
-        # Keeping track of bad files:
-        # badfile = os.path.join(os.path.expanduser('~'), 'bad_radar_azimuth.txt')
-        # with open(badfile, 'a+') as fid:
-        #     fid.write(radar_file_name + "\n")
 
     return is_good
 
-    
+
+def check_reflectivity(radar, refl_field_name='DBZ'):
+    """
+    Checking if radar has a proper reflectivity field.  It's a minor problem
+    concerning a few days in 2011 for CPOL.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_field_name: str
+            Name of the reflectivity field.
+
+    Return:
+    =======
+        is_good: bool
+            True if radar has a proper azimuth field.
+    """
+    is_good = True
+    dbz = radar.fields[refl_field_name]['data']
+
+    if np.ma.isMaskedArray(dbz):
+        if dbz.count() == 0:
+            # Reflectivity field is empty.
+            is_good = False
+
+    return is_good
+
+
 def correct_rhohv(radar, rhohv_name='RHOHV', snr_name='SNR'):
     """
     Correct cross correlation ratio (RHOHV) from noise. From the Schuur et al.
@@ -368,18 +405,14 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     # Calculate SNR
     snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name)
     # Sometimes the SNR is an empty array, this is due to the toa parameter.
-    # Here we try to recalculate the SNR with a lower toa value.
+    # Here we try to recalculate the SNR with a lower value for toa (top of atm).
     if snr['data'].count() == 0:
         snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name, toa=20000)
 
     if snr['data'].count() == 0:
-        snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name, toa=15000)
-
-    if snr['data'].count() == 0:
-        snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name, toa=10000)
-
-    if snr['data'].count() == 0:
-        pseudo_power = (radar.fields[refl_field]['data'] - 20.0*np.log10(range_grid / 1000.0))
+        # If it fails again, then we compute the SNR with the noise value
+        # given by the CPOL radar manufacturer.
+        snr = _my_snr_from_reflectivity(radar, refl_field=refl_field_name)
 
     return z_dict, temp_info_dict, snr
 

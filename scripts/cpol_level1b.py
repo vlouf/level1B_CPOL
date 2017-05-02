@@ -12,7 +12,6 @@ CPOL Level 1b main production line.
 
     timeout_handler
     chunks
-    check_azimuth
     production_line
     production_line_manager
     main
@@ -20,7 +19,6 @@ CPOL Level 1b main production line.
 # Python Standard Library
 import os
 import sys
-import glob
 import time
 import signal
 import logging
@@ -174,12 +172,14 @@ def production_line(radar_file_name, outpath=None):
         outpath: str
             Path for saving output data.
     """
-    # Create output file name and check if it already exists.
+    # Generate output file name.
     outfilename = os.path.basename(radar_file_name)
     outfilename = outfilename.replace("level1a", "level1b")
     if outpath is None:
         outpath = os.path.expanduser('~')
     outfilename = os.path.join(outpath, outfilename)
+
+    # Check if output file already exists.
     if os.path.isfile(outfilename):
         logger.error('Output file already exists for: %s.', outfilename)
         return None
@@ -191,12 +191,16 @@ def production_line(radar_file_name, outpath=None):
     try:
         radar = pyart.io.read(radar_file_name)
     except:
-        logger.error("MAJOR ERROR: Can't read input file named {}".format(radar_file_name))
+        logger.error("MAJOR ERROR: unable to read input file {}".format(radar_file_name))
         return None
 
-    # Check if radar is correct.
-    if not radar_codes.check_azimuth(radar, radar_file_name):
+    # Check if radar scan is complete.
+    if not radar_codes.check_azimuth(radar):
         logger.error("MAJOR ERROR: %s does not have a proper azimuth.", radar_file_name)
+        return None
+    # Check if radar reflecitivity field is correct.
+    if not radar_codes.check_reflectivity(radar):
+        logger.error("MAJOR ERROR: %s reflectivity field is empty.", radar_file_name)
         return None
 
     # Get radar's data date and time.
@@ -255,6 +259,7 @@ def production_line(radar_file_name, outpath=None):
     radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
     radar.fields['PHIDP_GG']['long_name'] = "giangrande_" + radar.fields['PHIDP_GG']['long_name']
     radar.fields['KDP_GG']['long_name'] = "giangrande_" + radar.fields['KDP_GG']['long_name']
+    logger.info('KDP/PHIDP Giangrande estimated.')
 
     # Bringi PHIDP/KDP
     phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter)
