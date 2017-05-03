@@ -36,6 +36,7 @@ from copy import deepcopy
 
 # Other Libraries
 import pyart
+import scipy
 import netCDF4
 import numpy as np
 
