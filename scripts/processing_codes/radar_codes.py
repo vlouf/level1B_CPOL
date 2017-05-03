@@ -204,7 +204,7 @@ def correct_zdr(radar, zdr_name='ZDR', snr_name='SNR'):
     return corr_zdr
 
 
-def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV', ncp_name='NCP'):
+def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP'):
     """
     Basic filtering
 
@@ -224,7 +224,7 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV', ncp_name='NCP'):
     """
     gf = pyart.filters.GateFilter(radar)
     gf.exclude_outside(refl_name, -20, 90)
-    gf.exclude_below(rhohv_name, 0.5)
+    gf.exclude_below(rhohv_name, 0.6)
 
     try:
         # NCP field is not present for older seasons.
@@ -487,5 +487,7 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=True, vel_name='VEL'):
                                                       vel_field=vel_name,
                                                       gatefilter=gf,
                                                       nyquist_vel=v_nyq_vel)
+
+    vdop_vel['units'] = "m/s"
 
     return vdop_vel

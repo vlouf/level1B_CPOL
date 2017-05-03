@@ -208,13 +208,6 @@ def production_line(radar_file_name, outpath=None):
     datestr = radar_start_date.strftime("%Y%m%d_%H%M")
     logger.info("%s read.", radar_file_name)
 
-    # Check date, if velocity needs to be refolded.
-    if radar_start_date.year > 2012:
-        refold_velocity = True
-        logger.info('PHIDP and VELOCITY will be refolded.')
-    else:
-        refold_velocity = False
-
     # Compute SNR
     try:
         height, temperature, snr = radar_codes.snr_and_sounding(radar, SOUND_DIR)
@@ -271,11 +264,15 @@ def production_line(radar_file_name, outpath=None):
     logger.info('KDP/PHIDP Bringi estimated.')
 
     # Unfold PHIDP, refold VELOCITY
-    phidp_unfold, vdop_refolded = phase_codes.unfold_phidp_vdop(radar, unfold_vel=refold_velocity)
+    phidp_unfold, vdop_refolded = phase_codes.unfold_phidp_vdop(radar)
     if phidp_unfold is not None:
         logger.info('PHIDP has been unfolded.')
         radar.add_field_like('PHIDP', 'PHIDP_CORR', phidp_unfold, replace_existing=True)
-    if vdop_refolded is not None:
+    # Check if velocity was refolded.
+    if vdop_refolded is None:
+        refold_velocity = False
+    else:
+        refold_velocity = True
         logger.info('Doppler velocity has been refolded.')
         radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
         radar.fields['VEL_CORR']['long_name'] = radar.fields['VEL_CORR']['long_name'] + "_refolded"
@@ -325,6 +322,7 @@ def production_line(radar_file_name, outpath=None):
     plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
 
     # Rename fields and remove unnecessary ones.
+    radar.add_field('DBZ_RAW', radar.fields.pop('DBZ'), replace_existing=True)
     radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
     radar.add_field('RHOHV', radar.fields.pop('RHOHV_CORR'), replace_existing=True)
     radar.add_field('ZDR', radar.fields.pop('ZDR_CORR'), replace_existing=True)
@@ -338,7 +336,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Hardcode mask
     for mykey in radar.fields:
-        if mykey in ['sounding_temperature', 'height', 'SNR', 'NCP', 'HYDRO']:
+        if mykey in ['sounding_temperature', 'height', 'SNR', 'NCP', 'HYDRO', 'DBZ_RAW']:
             # Virgin fields that are left untouch.
             continue
         else:

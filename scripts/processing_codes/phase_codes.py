@@ -192,8 +192,7 @@ def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHO
     return phidp_gg, kdp_gg
 
 
-def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI',
-                      vel_name='VEL', unfold_vel=False):
+def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI', vel_name='VEL'):
     """
     Unfold PHIDP and refold Doppler velocity.
 
@@ -207,8 +206,6 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
             PHIDP field name.
         vel_name: str
             VEL field name.
-        unfold_vel: bool
-            Switch the Doppler velocity refolding
 
     Returns:
     ========
@@ -257,6 +254,7 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
         print("No posr found unfolding phidp")
         unfold_vel = False
     else:
+        unfold_vel = True
         phidp = _unfold_phidp(deepcopy(phidp), posr, posazi)
         # Calculating the offset.
         tmp = deepcopy(phidp)
