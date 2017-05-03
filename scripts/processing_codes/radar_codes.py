@@ -39,6 +39,7 @@ import pyart
 import netCDF4
 import numpy as np
 
+from scipy import ndimage, signal, integrate, interpolate
 from csu_radartools import csu_liquid_ice_mass, csu_fhc
 
 
@@ -92,6 +93,21 @@ def _nearest(items, pivot):
             Value of the nearest item found.
     """
     return min(items, key=lambda x: abs(x - pivot))
+
+
+def _get_noise_threshold(filtered_data):
+    """
+    Compute the noise threshold.
+    """
+    n, bins = np.histogram(filtered_data, bins = 150)
+    peaks = scipy.signal.find_peaks_cwt(n, np.array([10]))
+    centers = bins[0:-1] + (bins[1] - bins[0])
+    search_data = n[peaks[0]:peaks[1]]
+    search_centers = centers[peaks[0]:peaks[1]]
+    locs = search_data.argsort()
+    noise_threshold = search_centers[locs[0]]
+
+    return noise_threshold
 
 
 def check_azimuth(radar):
@@ -204,7 +220,8 @@ def correct_zdr(radar, zdr_name='ZDR', snr_name='SNR'):
     return corr_zdr
 
 
-def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP'):
+def do_gatefilter(radar, noise_threshold, texture_name='TEXTURE',
+                  refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP'):
     """
     Basic filtering
 
@@ -224,7 +241,8 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP
     """
     gf = pyart.filters.GateFilter(radar)
     gf.exclude_outside(refl_name, -20, 90)
-    gf.exclude_below(rhohv_name, 0.6)
+    gf.exclude_below(rhohv_name, 0.5)
+    gf.exclude_above(texture_name, noise_threshold)
 
     try:
         # NCP field is not present for older seasons.
@@ -236,6 +254,34 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP
     gf_despeckeld = pyart.correct.despeckle_field(radar, refl_name, gatefilter=gf)
 
     return gf_despeckeld
+
+
+def get_texture(radar, vel_field_name='VEL'):
+    """
+    Compute the texture of the velocity field and its noise threshold.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        vel_field_name: str
+            Doppler velocity field name.
+
+    Returns:
+    ========
+        filtered_data: array
+            Velocity texture.
+        noise_threshold: float
+            The noise threshold estimated.
+    """
+    nyq = radar.instrument_parameters['nyquist_velocity']['data'][0]
+    vel = radar.fields[vel_field_name]['data']
+    data = ndimage.filters.generic_filter(vel, pyart.util.interval_std, size = (4,4), extra_arguments = (-nyq, nyq))
+    filtered_data = ndimage.filters.median_filter(data, size = (4,4))
+
+    noise_threshold = _get_noise_threshold(filtered_data)
+
+    return filtered_data, noise_threshold
 
 
 def filter_hardcoding(my_array, nuke_filter, bad=-9999):

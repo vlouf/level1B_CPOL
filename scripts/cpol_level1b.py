@@ -228,8 +228,13 @@ def production_line(radar_file_name, outpath=None):
     radar.add_field_like('RHOHV', 'RHOHV_CORR', rho_corr, replace_existing = True)
     logger.info('RHOHV corrected.')
 
+    # Get velocity field texture and noise threshold. (~3min to execute this function)
+    vel_texture, noise_threshold = radar_codes.get_texture(radar)
+    radar.add_field_like('VEL', 'TEXTURE', vel_texture, replace_existing = True)
+    logger.info('Texture computed.')
+
     # Get filter
-    gatefilter = radar_codes.do_gatefilter(radar, rhohv_name='RHOHV_CORR')
+    gatefilter = radar_codes.do_gatefilter(radar, noise_threshold, rhohv_name='RHOHV_CORR')
     logger.info('Filter initialized.')
 
     # Correct ZDR
