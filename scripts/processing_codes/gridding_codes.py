@@ -1,6 +1,10 @@
+# Python Standard Library
 import os
-import pyart
 import datetime
+
+# Other libraries
+import pyart
+import numpy as np
 
 
 def _get_latlon(radgrid):
@@ -65,7 +69,7 @@ def gridding_radar_150km(radar, radar_date, outpath):
         grid_limits=((0, 20000), (-145000.0, 145000.0), (-145000.0, 145000.0)))
 
     # Latitude Longitude field for each point.
-    longitude, latitude = _get_latlon(radgrid)
+    longitude, latitude = _get_latlon(grid_150km)
     grid_150km.add_field('longitude', longitude)
     grid_150km.add_field('latitude', latitude)
 
@@ -122,7 +126,7 @@ def gridding_radar_70km(radar, radar_date, outpath):
         grid_limits=((0, 20000), (-70000.0, 70000.0), (-70000.0, 70000.0)))
 
     # Latitude Longitude field for each point.
-    longitude, latitude = _get_latlon(radgrid)
+    longitude, latitude = _get_latlon(grid_70km)
     grid_70km.add_field('longitude', longitude)
     grid_70km.add_field('latitude', latitude)
 

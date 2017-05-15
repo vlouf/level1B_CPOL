@@ -327,10 +327,10 @@ def production_line(radar_file_name, outpath=None):
 
     # Liquid/Ice Mass
     # We decided to not give these products.
-    liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
-    radar.add_field('LWC', liquid_water_mass)
-    radar.add_field('IWC', ice_mass)
-    logger.info('Liquid/Ice mass estimated.')
+    # liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
+    # radar.add_field('LWC', liquid_water_mass)
+    # radar.add_field('IWC', ice_mass)
+    # logger.info('Liquid/Ice mass estimated.')
 
     # Treatment is finished!
     end_time = time.time()
@@ -370,6 +370,12 @@ def production_line(radar_file_name, outpath=None):
     save_time = time.time()
     logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (save_time - end_time))
 
+    # Deleting a bunch of redundant gridded product.
+    logger.info("Gridding started.")
+    radar.fields.pop('KDP_BRINGI')
+    radar.fields.pop('PHIDP_BRINGI')
+    radar.fields.pop('KDP')
+    radar.fields.pop('PHIDP')
     # Gridding (and saving)
     gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=OUTPATH_GRID)
     gridding_codes.gridding_radar_70km(radar, radar_start_date, outpath=OUTPATH_GRID)
