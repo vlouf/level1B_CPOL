@@ -263,6 +263,53 @@ def do_gatefilter(radar, noise_threshold=None, texture_name='TEXTURE',
     return gf_despeckeld
 
 
+def dsd_retrieval(radar, refl_name='DBZ', zdr_name='ZDR', kdp_name='KDP_GG'):
+    """
+    Compute the DSD retrieval using the csu library.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_name: str
+            Reflectivity field name.
+        zdr_name: str
+            ZDR field name.
+        kdp_name: str
+            KDP field name.
+
+    Returns:
+    ========
+        nw_dict: dict
+            Normalized Intercept Parameter.
+        d0_dict: dict
+            Median Volume Diameter.
+    """
+    dbz = radar.fields[refl_name]['data'].filled(np.NaN)
+    zdr = radar.fields[zdr_name]['data'].filled(np.NaN)
+    try:
+        kdp = radar.fields[kdp_name]['data'].filled(np.NaN)
+    except AttributeError:
+        kdp = radar.fields[kdp_name]['data']
+
+    d0, Nw, mu = csu_dsd.calc_dsd(dz=dbz, zdr=zdr, kdp=kdp, band='C')
+
+    Nw = np.ma.masked_where(np.isnan(Nw), Nw)
+    d0 = np.ma.masked_where(np.isnan(d0), d0)
+
+    nw_dict = {'data': Nw,
+               'units': '', 'long_name': 'Normalized Intercept Parameter',
+               'standard_name': 'Normalized Intercept Parameter',
+               'description': "NW retrieval based on Bringi et al. (2009). Mu can not be retrieved alongside NW and D0."}
+
+    d0_dict = {'data': d0,
+               'units': 'mm', 'long_name': 'Median Volume Diameter',
+               'standard_name': 'Median Volume Diameter',
+               'description': "D0 retrieval based on Bringi et al. (2009). Mu can not be retrieved alongside NW and D0."}
+
+    return nw_dict, d0_dict
+
+
 def get_texture(radar, vel_field_name='VEL'):
     """
     Compute the texture of the velocity field and its noise threshold.
@@ -404,12 +451,15 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     radar_z = radar.fields[height_name]['data']
 
     liquid_water_mass, ice_mass = csu_liquid_ice_mass.calc_liquid_ice_mass(refl,
-        zdr, radar_z/1000, T=radar_T, method='cifelli')
+        zdr, radar_z/1000, T=radar_T)
 
-    liquid_water_mass = {'data': liquid_water_mass, 'units': 'g m-3', 'long_name': \
-                         'Liquid Water Content', 'standard_name': 'liquid_water_content'}
+    liquid_water_mass = {'data': liquid_water_mass, 'units': 'g m-3',
+                        'long_name': 'Liquid Water Content',
+                        'standard_name': 'liquid_water_content',
+                        'description': "Liquid Water Content using Carey and Rutledge (2000) algorithm."}
     ice_mass = {'data': ice_mass, 'units': 'g m-3', 'long_name': 'Ice Water Content',
-                'standard_name': 'ice_water_content'}
+                'standard_name': 'ice_water_content',
+                'description': "Ice Water Content using Carey and Rutledge (2000) algorithm."}
 
     return liquid_water_mass, ice_mass
 

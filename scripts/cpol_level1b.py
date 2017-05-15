@@ -315,15 +315,22 @@ def production_line(radar_file_name, outpath=None):
     #     print("WARNING: hail detection in Darwin. NOT POSSIBLE!", os.path.basename(outfilename))
 
     # Rainfall rate
-     rainfall = rainfall_rate(radar)
-     radar.add_field("RAINFALL", rainfall)
+    rainfall = radar_codes.rainfall_rate(radar)
+    radar.add_field("RAINFALL", rainfall)
+    logger.info('Rainfall rate estimated.')
+
+    # DSD retrieval
+    nw_dict, d0_dict = radar_codes.dsd_retrieval(radar)
+    radar.add_field("D0", d0_dict)
+    radar.add_field("NW", nw_dict)
+    logger.info('DSD estimated.')
 
     # Liquid/Ice Mass
     # We decided to not give these products.
-    # liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
-    # radar.add_field('LWC', liquid_water_mass)
-    # radar.add_field('IWC', ice_mass)
-    # logger.info('Liquid/Ice mass estimated.')
+    liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
+    radar.add_field('LWC', liquid_water_mass)
+    radar.add_field('IWC', ice_mass)
+    logger.info('Liquid/Ice mass estimated.')
 
     # Treatment is finished!
     end_time = time.time()
