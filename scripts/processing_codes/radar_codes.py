@@ -242,13 +242,15 @@ def do_gatefilter(radar, noise_threshold, texture_name='TEXTURE',
     """
     gf = pyart.filters.GateFilter(radar)
     gf.exclude_outside(refl_name, -20, 90)
-    gf.exclude_below(rhohv_name, 0.5)
-    gf.exclude_above(texture_name, noise_threshold)
+    gf.exclude_below(rhohv_name, 0.7)
+
+    if not np.isnan(noise_threshold):
+        gf.exclude_above(texture_name, noise_threshold)
 
     try:
         # NCP field is not present for older seasons.
         radar.fields[ncp_name]
-        gf.exclude_below(ncp_name, 0.3)
+        gf.exclude_below(ncp_name, 0.5)
     except KeyError:
         pass
 
@@ -280,7 +282,11 @@ def get_texture(radar, vel_field_name='VEL'):
     data = ndimage.filters.generic_filter(vel, pyart.util.interval_std, size = (4,4), extra_arguments = (-nyq, nyq))
     filtered_data = ndimage.filters.median_filter(data, size = (4,4))
 
-    noise_threshold = _get_noise_threshold(filtered_data)
+    try:
+        noise_threshold = _get_noise_threshold(filtered_data)
+    except:
+        noise_threshold = np.NaN
+        print("Could not determine the noise threshold")
 
     return filtered_data, noise_threshold
 
