@@ -175,6 +175,9 @@ def production_line(radar_file_name, outpath=None):
     # Generate output file name.
     outfilename = os.path.basename(radar_file_name)
     outfilename = outfilename.replace("level1a", "level1b")
+    # Correct an occasional mislabelling from RadX.
+    if "SURV" in outfilename:
+        outfilename = outfilename.replace("SURV", "PPI")
     if outpath is None:
         outpath = os.path.expanduser('~')
     outfilename = os.path.join(outpath, outfilename)
@@ -214,8 +217,8 @@ def production_line(radar_file_name, outpath=None):
     except ValueError:
         logger.error("Impossible to compute SNR")
         return None
-    radar.add_field('sounding_temperature', temperature, replace_existing = True)
-    radar.add_field('height', height, replace_existing = True)
+    radar.add_field('SOUNDING_TEMPERATURE', temperature, replace_existing = True)
+    radar.add_field('HEIGHT', height, replace_existing = True)
     try:
         radar.fields['SNR']
         logger.info('SNR already exists.')
@@ -229,12 +232,12 @@ def production_line(radar_file_name, outpath=None):
     logger.info('RHOHV corrected.')
 
     # Get velocity field texture and noise threshold. (~3min to execute this function)
-    vel_texture, noise_threshold = radar_codes.get_texture(radar)
-    radar.add_field_like('VEL', 'TEXTURE', vel_texture, replace_existing = True)
-    logger.info('Texture computed.')
+    # vel_texture, noise_threshold = radar_codes.get_texture(radar)
+    # radar.add_field_like('VEL', 'TEXTURE', vel_texture, replace_existing = True)
+    # logger.info('Texture computed.')
 
     # Get filter
-    gatefilter = radar_codes.do_gatefilter(radar, noise_threshold, rhohv_name='RHOHV_CORR')
+    gatefilter = radar_codes.do_gatefilter(radar, rhohv_name='RHOHV_CORR')
     logger.info('Filter initialized.')
 
     # Correct ZDR
@@ -291,13 +294,13 @@ def production_line(radar_file_name, outpath=None):
     # Correct Attenuation ZH
     atten_spec, zh_corr = atten_codes.correct_attenuation_zh(radar)
     radar.add_field_like('DBZ', 'DBZ_CORR', zh_corr, replace_existing=True)
-    radar.add_field('specific_attenuation_zh', atten_spec, replace_existing=True)
+    radar.add_field('AC_ZH', atten_spec, replace_existing=True)
     logger.info('Attenuation on reflectivity corrected.')
 
     # Correct Attenuation ZDR
     atten_spec_zdr, zdr_corr = atten_codes.correct_attenuation_zdr(radar)
     radar.add_field_like('ZDR', 'ZDR_CORR', zdr_corr, replace_existing=True)
-    radar.add_field('specific_attenuation_zdr', atten_spec_zdr, replace_existing=True)
+    radar.add_field('AC_ZDR', atten_spec_zdr, replace_existing=True)
     logger.info('Attenuation on ZDR corrected.')
 
     # Hydrometeors classification
@@ -305,11 +308,12 @@ def production_line(radar_file_name, outpath=None):
     radar.add_field('HYDRO', hydro_class, replace_existing=True)
     logger.info('Hydrometeors classification estimated.')
     # Check if Hail it found hail.
-    if (hydro_class['data'] == 9).sum() != 0:
-        print("WARNING: hail detection in Darwin. NOT POSSIBLE!", os.path.basename(outfilename))
-        fout = os.path.join(os.path.expanduser('~'), "hail_detection.txt")
-        with open(fout, "a+") as fid:
-            fid.write(os.path.basename(outfilename) + "\n")
+    # if (hydro_class['data'] == 9).sum() != 0:
+    #     print("WARNING: hail detection in Darwin. NOT POSSIBLE!", os.path.basename(outfilename))
+
+    # Rainfall rate
+     rainfall = rainfall_rate(radar)
+     radar.add_field("RAINFALL", rainfall)
 
     # Liquid/Ice Mass
     # We decided to not give these products.
@@ -341,7 +345,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Hardcode mask
     for mykey in radar.fields:
-        if mykey in ['sounding_temperature', 'height', 'SNR', 'NCP', 'HYDRO', 'DBZ_RAW']:
+        if mykey in ['SOUNDING_TEMPERATURE', 'HEIGHT', 'SNR', 'NCP', 'HYDRO', 'DBZ_RAW']:
             # Virgin fields that are left untouch.
             continue
         else:

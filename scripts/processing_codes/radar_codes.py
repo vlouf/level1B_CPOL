@@ -221,7 +221,7 @@ def correct_zdr(radar, zdr_name='ZDR', snr_name='SNR'):
     return corr_zdr
 
 
-def do_gatefilter(radar, noise_threshold, texture_name='TEXTURE',
+def do_gatefilter(radar, noise_threshold=None, texture_name='TEXTURE',
                   refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP'):
     """
     Basic filtering
@@ -244,13 +244,17 @@ def do_gatefilter(radar, noise_threshold, texture_name='TEXTURE',
     gf.exclude_outside(refl_name, -20, 90)
     gf.exclude_below(rhohv_name, 0.7)
 
-    if not np.isnan(noise_threshold):
-        gf.exclude_above(texture_name, noise_threshold)
+    # if noise_threshold is not None:
+    #     if not np.isnan(noise_threshold):
+    #         try:
+    #             gf.exclude_above(texture_name, noise_threshold)
+    #         except KeyError:
+    #             pass
 
     try:
         # NCP field is not present for older seasons.
         radar.fields[ncp_name]
-        gf.exclude_below(ncp_name, 0.5)
+        gf.exclude_below(ncp_name, 0.3)
     except KeyError:
         pass
 
@@ -318,9 +322,9 @@ def filter_hardcoding(my_array, nuke_filter, bad=-9999):
 
 
 def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
-                               kdp_name='KDP', rhohv_name='RHOHV_CORR',
-                               temperature_name='sounding_temperature',
-                               height_name='height'):
+                               kdp_name='KDP_GG', rhohv_name='RHOHV_CORR',
+                               temperature_name='SOUNDING_TEMPERATURE',
+                               height_name='HEIGHT'):
     """
     Compute hydrometeo classification.
 
@@ -370,7 +374,7 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
 
 
 def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
-                    temperature_name='sounding_temperature', height_name='height'):
+                    temperature_name='SOUNDING_TEMPERATURE', height_name='HEIGHT'):
     """
     Compute the liquid/ice water content using the csu library.
 
@@ -408,6 +412,49 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                 'standard_name': 'ice_water_content'}
 
     return liquid_water_mass, ice_mass
+
+
+def rainfall_rate(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR', kdp_name='KDP_GG', hydro_name='HYDRO'):
+    """
+    Rainfall rate algorithm from csu_radartools.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_name: str
+            Reflectivity field name.
+        zdr_name: str
+            ZDR field name.
+        kdp_name: str
+            KDP field name.
+        hydro_name: str
+            Hydrometeor classification field name.
+
+    Returns:
+    ========
+        rainrate: dict
+            Rainfall rate.
+    """
+    dbz = radar.fields[refl_name]['data'].filled(np.NaN)
+    zdr = radar.fields[zdr_name]['data'].filled(np.NaN)
+    fhc = radar.fields[hydro_name]['data']
+    try:
+        kdp = radar.fields[kdp_name]['data'].filled(np.NaN)
+    except AttributeError:
+        kdp = radar.fields[kdp_name]['data']
+
+    rain, method = csu_blended_rain.calc_blended_rain_tropical(dz=dbz, zdr=zdr, kdp=kdp, fhc=fhc, band='C')
+    rain[rain == 0] = np.NaN
+    rain = np.ma.masked_where(np.isnan(rain), rain)
+
+    rainrate = {"long_name": 'Blended Rainfall Rate',
+           "units": "mm h-1",
+           "standard_name": "Rainfall Rate",
+           "description": "Rainfall rate algorithm based on Thompson et al. 2016."
+           "data": rain}
+
+    return rainrate
 
 
 def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):

@@ -3,7 +3,24 @@ import pyart
 import datetime
 
 
-def gridding_radar_70km(radar, radar_date, outpath):
+def _get_latlon(radgrid):
+    # Declare array, filled 0 in order to not have a masked array.
+    lontot = np.zeros_like(radgrid.fields['DBZ']['data'].filled(0))
+    lattot = np.zeros_like(radgrid.fields['DBZ']['data'].filled(0))
+
+    for lvl in range(radgrid.nz):
+        lontot[lvl, :, :], lattot[lvl, :, :] = radgrid.get_point_longitude_latitude(lvl)
+
+    longitude = pyart.config.get_metadata('longitude')
+    latitude = pyart.config.get_metadata('latitude')
+
+    longitude['data'] = lontot
+    latitude['data'] = lattot
+
+    return longitude, latitude
+
+
+def gridding_radar_150km(radar, radar_date, outpath):
     """
     Map a single radar to a Cartesian grid of 70 km range and 1 km resolution.
 
@@ -47,13 +64,18 @@ def gridding_radar_70km(radar, radar_date, outpath):
         grid_shape=(41, 117, 117),
         grid_limits=((0, 20000), (-145000.0, 145000.0), (-145000.0, 145000.0)))
 
+    # Latitude Longitude field for each point.
+    longitude, latitude = _get_latlon(radgrid)
+    grid_150km.add_field('longitude', longitude)
+    grid_150km.add_field('latitude', latitude)
+
     # Saving data.
     grid_150km.write(outfilename, arm_time_variables=True)
 
     return None
 
 
-def gridding_radar_150km(radar, radar_date, outpath):
+def gridding_radar_70km(radar, radar_date, outpath):
     """
     Map a single radar to a Cartesian grid of 150 km range and 2.5km resolution.
 
@@ -98,6 +120,11 @@ def gridding_radar_150km(radar, radar_date, outpath):
         radar, gatefilters=my_gatefilter,
         grid_shape=(41, 141, 141),
         grid_limits=((0, 20000), (-70000.0, 70000.0), (-70000.0, 70000.0)))
+
+    # Latitude Longitude field for each point.
+    longitude, latitude = _get_latlon(radgrid)
+    grid_70km.add_field('longitude', longitude)
+    grid_70km.add_field('latitude', latitude)
 
     # Saving data.
     grid_70km.write(outfilename, arm_time_variables=True)
