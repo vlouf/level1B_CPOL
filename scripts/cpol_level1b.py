@@ -217,8 +217,8 @@ def production_line(radar_file_name, outpath=None):
     except ValueError:
         logger.error("Impossible to compute SNR")
         return None
-    radar.add_field('SOUNDING_TEMPERATURE', temperature, replace_existing = True)
-    radar.add_field('HEIGHT', height, replace_existing = True)
+    radar.add_field('temperature', temperature, replace_existing = True)
+    radar.add_field('height', height, replace_existing = True)
     try:
         radar.fields['SNR']
         logger.info('SNR already exists.')
@@ -345,7 +345,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Hardcode mask
     for mykey in radar.fields:
-        if mykey in ['SOUNDING_TEMPERATURE', 'HEIGHT', 'SNR', 'NCP', 'HYDRO', 'DBZ_RAW']:
+        if mykey in ['temperature', 'height', 'SNR', 'NCP', 'HYDRO', 'DBZ_RAW']:
             # Virgin fields that are left untouch.
             continue
         else:

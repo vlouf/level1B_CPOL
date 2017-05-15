@@ -323,8 +323,8 @@ def filter_hardcoding(my_array, nuke_filter, bad=-9999):
 
 def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                                kdp_name='KDP_GG', rhohv_name='RHOHV_CORR',
-                               temperature_name='SOUNDING_TEMPERATURE',
-                               height_name='HEIGHT'):
+                               temperature_name='temperature',
+                               height_name='height'):
     """
     Compute hydrometeo classification.
 
@@ -374,7 +374,7 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
 
 
 def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
-                    temperature_name='SOUNDING_TEMPERATURE', height_name='HEIGHT'):
+                    temperature_name='temperature', height_name='height'):
     """
     Compute the liquid/ice water content using the csu library.
 
