@@ -111,7 +111,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
 
     # Initializing figure.
     gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(7, 2, figsize=(12, 35), sharex=True, sharey=True)
+    fig, the_ax = pl.subplots(6, 2, figsize=(12, 35), sharex=True, sharey=True)
     the_ax = the_ax.flatten()
     # Plotting reflectivity
     gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
@@ -133,10 +133,10 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     gr.plot_ppi('RHOHV_CORR', ax = the_ax[9], vmin=0, vmax=1, norm=colors.LogNorm(vmin=0.4, vmax=1), cmap='rainbow')
 
     gr.plot_ppi('SNR', ax = the_ax[10], cmap='OrRd', vmin=0, vmax=80)
-    gr.plot_ppi('TEXTURE', ax = the_ax[11], vmin=0, vmax=10, cmap='jet')
+    # gr.plot_ppi('TEXTURE', ax = the_ax[11], vmin=0, vmax=10, cmap='jet')
 
-    gr.plot_ppi('RAINFALL', ax = the_ax[12], gatefilter=gatefilter, cmap='OrRd', vmin=0, vmax=80)
-    gr.plot_ppi('AC_ZH', gatefilter=gatefilter, ax = the_ax[13], vmin=0, vmax=10, cmap='jet')
+    gr.plot_ppi('RAINFALL', ax = the_ax[11], gatefilter=gatefilter, cmap='OrRd', vmin=0, vmax=80)
+    # gr.plot_ppi('AC_ZH', gatefilter=gatefilter, ax = the_ax[13], vmin=0, vmax=10, cmap='jet')
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
@@ -338,7 +338,10 @@ def production_line(radar_file_name, outpath=None):
 
     # Plot check figure.
     logger.info('Plotting figure')
-    plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
+    try:
+        plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
+    except Exception:
+        logger.exception("Problem while trying to plot figure.")
 
     # Rename fields and remove unnecessary ones.
     radar.add_field('DBZ_RAW', radar.fields.pop('DBZ'), replace_existing=True)
