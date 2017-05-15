@@ -3,8 +3,9 @@ Codes for correcting and estimating various radar and meteorological parameters.
 
 @title: radar_codes
 @author: Valentin Louf <valentin.louf@monash.edu>
-@institution: Bureau of Meteorology
-@date: 04/04/2017
+@institutions: Monash University and the Australian Bureau of Meteorology
+@creation: 04/04/2017
+@date: 15/05/2017
 
 .. autosummary::
     :toctree: generated/
@@ -41,7 +42,7 @@ import netCDF4
 import numpy as np
 
 from scipy import ndimage, signal, integrate, interpolate
-from csu_radartools import csu_liquid_ice_mass, csu_fhc
+from csu_radartools import csu_liquid_ice_mass, csu_fhc, csu_blended_rain, csu_dsd
 
 
 def _my_snr_from_reflectivity(radar, refl_field='DBZ'):
