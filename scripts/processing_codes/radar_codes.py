@@ -501,7 +501,7 @@ def rainfall_rate(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR', kdp_name='KD
     rainrate = {"long_name": 'Blended Rainfall Rate',
            "units": "mm h-1",
            "standard_name": "Rainfall Rate",
-           "description": "Rainfall rate algorithm based on Thompson et al. 2016."
+           "description": "Rainfall rate algorithm based on Thompson et al. 2016.",
            "data": rain}
 
     return rainrate
