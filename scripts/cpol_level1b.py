@@ -111,7 +111,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
 
     # Initializing figure.
     gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(6, 2, figsize=(12, 30), sharex=True, sharey=True)
+    fig, the_ax = pl.subplots(7, 2, figsize=(12, 35), sharex=True, sharey=True)
     the_ax = the_ax.flatten()
     # Plotting reflectivity
     gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
@@ -135,6 +135,9 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     gr.plot_ppi('SNR', ax = the_ax[10], cmap='OrRd', vmin=0, vmax=80)
     gr.plot_ppi('TEXTURE', ax = the_ax[11], vmin=0, vmax=10, cmap='jet')
 
+    gr.plot_ppi('RAINFALL', ax = the_ax[12], gatefilter=gatefilter, cmap='OrRd', vmin=0, vmax=80)
+    gr.plot_ppi('AC_ZH', gatefilter=gatefilter, ax = the_ax[13], vmin=0, vmax=10, cmap='jet')
+
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
         ax_sl.set_aspect(1)
@@ -145,15 +148,15 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     pl.savefig(outfile)  # Saving figure.
     pl.close()
 
-    # HYDRO CLASSIFICATION
-    hid_colors = ['White', 'LightBlue', 'MediumBlue', 'DarkOrange', 'LightPink',
-                  'Cyan', 'DarkGray', 'Lime', 'Yellow', 'Red', 'Fuchsia']
-    cmaphid = colors.ListedColormap(hid_colors)
-
-    fig, ax0 = pl.subplots(1, 1, figsize = (6, 5))
-    gr.plot_ppi('HYDRO', vmin=0, vmax=10, cmap=cmaphid)
-    gr.cbs[-1] = adjust_fhc_colorbar_for_pyart(gr.cbs[-1])
-    pl.savefig(outfile.replace(".png", "_HYDROCLASS.png"))
+    # # HYDRO CLASSIFICATION
+    # hid_colors = ['White', 'LightBlue', 'MediumBlue', 'DarkOrange', 'LightPink',
+    #               'Cyan', 'DarkGray', 'Lime', 'Yellow', 'Red', 'Fuchsia']
+    # cmaphid = colors.ListedColormap(hid_colors)
+    #
+    # fig, ax0 = pl.subplots(1, 1, figsize = (6, 5))
+    # gr.plot_ppi('HYDRO', vmin=0, vmax=10, cmap=cmaphid)
+    # gr.cbs[-1] = adjust_fhc_colorbar_for_pyart(gr.cbs[-1])
+    # pl.savefig(outfile.replace(".png", "_HYDROCLASS.png"))
 
     return None
 
