@@ -2,9 +2,9 @@
 import os
 import datetime
 
-# Other libraries
-import pyart
+# Other Libraries 
 import numpy as np
+import pyart
 
 
 def _get_latlon(radgrid):

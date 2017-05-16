@@ -370,12 +370,16 @@ def production_line(radar_file_name, outpath=None):
     save_time = time.time()
     logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (save_time - end_time))
 
-    # Deleting a bunch of redundant gridded product.
+    # Deleting all unwanted keys for gridded product.
     logger.info("Gridding started.")
-    radar.fields.pop('KDP_BRINGI')
-    radar.fields.pop('PHIDP_BRINGI')
-    radar.fields.pop('KDP')
-    radar.fields.pop('PHIDP')
+    unwanted_keys = []
+    goodkeys = ['ZDR', 'RHOHV', 'temperature', 'PHIDP_GG', 'KDP_GG',
+                'HYDRO', 'RAINFALL', 'D0', 'NW', 'DBZ_RAW', 'DBZ', 'VEL_RAW', 'VEL']
+    for mykey in radar.fields.keys():
+        if mykey not in goodkeys:
+            unwanted_keys.append(mykey)
+    for mykey in unwanted_keys:
+        radar.fields.pop(mykey)
     # Gridding (and saving)
     gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=OUTPATH_GRID)
     gridding_codes.gridding_radar_70km(radar, radar_start_date, outpath=OUTPATH_GRID)
