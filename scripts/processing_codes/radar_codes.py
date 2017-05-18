@@ -295,12 +295,13 @@ def dsd_retrieval(radar, refl_name='DBZ', zdr_name='ZDR', kdp_name='KDP_GG'):
 
     d0, Nw, mu = csu_dsd.calc_dsd(dz=dbz, zdr=zdr, kdp=kdp, band='C')
 
+    Nw = np.log10(Nw)
     Nw = np.ma.masked_where(np.isnan(Nw), Nw)
     d0 = np.ma.masked_where(np.isnan(d0), d0)
 
     nw_dict = {'data': Nw,
-               'units': '', 'long_name': 'Normalized Intercept Parameter',
-               'standard_name': 'Normalized Intercept Parameter',
+               'units': 'unitless (log10)', 'long_name': 'Log10 of the Normalized Intercept Parameter',
+               'standard_name': 'Log10 of the Normalized Intercept Parameter',
                'description': "NW retrieval based on Bringi et al. (2009). Mu can not be retrieved alongside NW and D0."}
 
     d0_dict = {'data': d0,
@@ -465,7 +466,7 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     return liquid_water_mass, ice_mass
 
 
-def rainfall_rate(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR', kdp_name='KDP_GG', hydro_name='HYDRO'):
+def rainfall_rate(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR', kdp_name='KDP_GG', hydro_name='radar_echo_classification'):
     """
     Rainfall rate algorithm from csu_radartools.
 

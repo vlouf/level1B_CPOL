@@ -52,7 +52,7 @@ def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
     return atten_specific, atten
 
 
-def correct_attenuation_zdr(radar, zdr_name='ZDR', kdp_name='KDP_GG'):
+def correct_attenuation_zdr(radar, zdr_name='ZDR_CORR', kdp_name='KDP_GG'):
     """
     Correct attenuation on differential reflectivity. KDP_GG has been
     cleaned of noise, that's why we use it.

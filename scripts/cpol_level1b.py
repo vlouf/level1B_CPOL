@@ -111,32 +111,28 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
 
     # Initializing figure.
     gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(6, 2, figsize=(12, 35), sharex=True, sharey=True)
+    fig, the_ax = pl.subplots(6, 2, figsize=(12, 30), sharex=True, sharey=True)
     the_ax = the_ax.flatten()
     # Plotting reflectivity
-    gr.plot_ppi('DBZ', ax = the_ax[0], vmin=-10, vmax=70)
-    gr.plot_ppi('DBZ_CORR', ax = the_ax[1], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSRef, vmin=-10, vmax=70)
+    gr.plot_ppi('total_power', ax = the_ax[0])
+    gr.plot_ppi('corrected_reflectivity', ax = the_ax[1], gatefilter=gatefilter)
 
-    gr.plot_ppi('ZDR', ax = the_ax[2], vmin=-5, vmax=10, cmap='rainbow')  # ZDR
-    gr.plot_ppi('ZDR_CORR', ax = the_ax[3], gatefilter=gatefilter, vmin=-5, vmax=10, cmap='rainbow')
+    gr.plot_ppi('differential_reflectivity', ax = the_ax[2])
+    gr.plot_ppi('corrected_differential_reflectivity', ax = the_ax[3], gatefilter=gatefilter)
 
-    gr.plot_ppi('PHIDP', ax = the_ax[4], vmin=0, vmax=180, cmap='OrRd')
-    try:
-        gr.plot_ppi('PHIDP_CORR', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='OrRd')
-    except KeyError:
-        gr.plot_ppi('PHIDP', ax = the_ax[5], gatefilter=gatefilter, vmin=0, vmax=180, cmap='OrRd')
+    gr.plot_ppi('corrected_differential_phase', ax = the_ax[4])
+    gr.plot_ppi('giangrande_corrected_differential_phase', ax = the_ax[5],
+                gatefilter=gatefilter, vmin=-360, vmax=360,
+                cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
 
-    gr.plot_ppi('VEL', ax = the_ax[6], cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
-    gr.plot_ppi('VEL_UNFOLDED', ax = the_ax[7], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-40, vmax=40)
+    gr.plot_ppi('velocity', ax = the_ax[6])
+    gr.plot_ppi('corrected_velocity', ax = the_ax[7], gatefilter=gatefilter)
 
-    gr.plot_ppi('RHOHV', ax = the_ax[8], vmin=0, vmax=1, norm=colors.LogNorm(vmin=0.4, vmax=1), cmap='rainbow')
-    gr.plot_ppi('RHOHV_CORR', ax = the_ax[9], vmin=0, vmax=1, norm=colors.LogNorm(vmin=0.4, vmax=1), cmap='rainbow')
+    gr.plot_ppi('cross_correlation_ratio', ax = the_ax[8], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
+    gr.plot_ppi('radar_echo_classification', ax = the_ax[9])
 
-    gr.plot_ppi('SNR', ax = the_ax[10], cmap='OrRd', vmin=0, vmax=80)
-    # gr.plot_ppi('TEXTURE', ax = the_ax[11], vmin=0, vmax=10, cmap='jet')
-
-    gr.plot_ppi('RAINFALL', ax = the_ax[11], gatefilter=gatefilter, cmap='OrRd', vmin=0, vmax=80)
-    # gr.plot_ppi('AC_ZH', gatefilter=gatefilter, ax = the_ax[13], vmin=0, vmax=10, cmap='jet')
+    gr.plot_ppi('NW', ax = the_ax[10], cmap='OrRd', vmin=0, vmax=8)
+    gr.plot_ppi('radar_estimated_rain_rate', ax = the_ax[11], gatefilter=gatefilter)
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
@@ -297,18 +293,18 @@ def production_line(radar_file_name, outpath=None):
     # Correct Attenuation ZH
     atten_spec, zh_corr = atten_codes.correct_attenuation_zh(radar)
     radar.add_field_like('DBZ', 'DBZ_CORR', zh_corr, replace_existing=True)
-    radar.add_field('AC_ZH', atten_spec, replace_existing=True)
+    radar.add_field('specific_attenuation_reflectivity', atten_spec, replace_existing=True)
     logger.info('Attenuation on reflectivity corrected.')
 
     # Correct Attenuation ZDR
     atten_spec_zdr, zdr_corr = atten_codes.correct_attenuation_zdr(radar)
     radar.add_field_like('ZDR', 'ZDR_CORR', zdr_corr, replace_existing=True)
-    radar.add_field('AC_ZDR', atten_spec_zdr, replace_existing=True)
+    radar.add_field('specific_attenuation_differential_reflectivity', atten_spec_zdr, replace_existing=True)
     logger.info('Attenuation on ZDR corrected.')
 
     # Hydrometeors classification
     hydro_class = radar_codes.hydrometeor_classification(radar)
-    radar.add_field('HYDRO', hydro_class, replace_existing=True)
+    radar.add_field('radar_echo_classification', hydro_class, replace_existing=True)
     logger.info('Hydrometeors classification estimated.')
     # Check if Hail it found hail.
     # if (hydro_class['data'] == 9).sum() != 0:
@@ -316,7 +312,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Rainfall rate
     rainfall = radar_codes.rainfall_rate(radar)
-    radar.add_field("RAINFALL", rainfall)
+    radar.add_field("radar_estimated_rain_rate", rainfall)
     logger.info('Rainfall rate estimated.')
 
     # DSD retrieval
@@ -336,26 +332,6 @@ def production_line(radar_file_name, outpath=None):
     end_time = time.time()
     logger.info("Treatment for %s done in %0.2f seconds.", os.path.basename(outfilename), (end_time - start_time))
 
-    # Plot check figure.
-    logger.info('Plotting figure')
-    try:
-        plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
-    except Exception:
-        logger.exception("Problem while trying to plot figure.")
-
-    # Rename fields and remove unnecessary ones.
-    radar.add_field('DBZ_RAW', radar.fields.pop('DBZ'), replace_existing=True)
-    radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
-    radar.add_field('RHOHV', radar.fields.pop('RHOHV_CORR'), replace_existing=True)
-    radar.add_field('ZDR', radar.fields.pop('ZDR_CORR'), replace_existing=True)
-    radar.add_field('VEL_RAW', radar.fields.pop('VEL'), replace_existing=True)
-    radar.add_field('VEL', radar.fields.pop('VEL_UNFOLDED'), replace_existing=True)
-    try:
-        vdop_art = radar.fields['PHIDP_CORR']
-        radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
-    except KeyError:
-        pass
-
     # Hardcode mask
     for mykey in radar.fields:
         if mykey in ['temperature', 'height', 'SNR', 'NCP', 'HYDRO', 'DBZ_RAW']:
@@ -365,6 +341,61 @@ def production_line(radar_file_name, outpath=None):
             radar.fields[mykey]['data'] = radar_codes.filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
     logger.info('Hardcoding gatefilter to Fields done.')
 
+    # Rename fields and remove unnecessary ones.
+    try:
+        vdop_art = radar.fields['PHIDP_CORR']
+        radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
+    except KeyError:
+        pass
+    try:
+        vdop_art = radar.fields['NCP']
+        radar.add_field('normalized_coherent_power', radar.fields.pop('NCP'), replace_existing=True)
+    except KeyError:
+        pass
+    # VEL
+    radar.add_field('velocity', radar.fields.pop('VEL'), replace_existing=True)
+    radar.add_field('corrected_velocity', radar.fields.pop('VEL_UNFOLDED'), replace_existing=True)
+    # DBZ
+    radar.add_field('total_power', radar.fields.pop('DBZ'), replace_existing=True)
+    radar.add_field('corrected_reflectivity', radar.fields.pop('DBZ_CORR'), replace_existing=True)
+    # RHOHV
+    radar.add_field('RHOHV', radar.fields.pop('RHOHV_CORR'), replace_existing=True)  # Remove RHOHV
+    radar.add_field('cross_correlation_ratio', radar.fields.pop('RHOHV'), replace_existing=True)
+    # ZDR
+    radar.add_field('differential_reflectivity', radar.fields.pop('ZDR'), replace_existing=True)
+    radar.add_field('corrected_differential_reflectivity', radar.fields.pop('ZDR_CORR'), replace_existing=True)
+    # PHIDP
+    radar.add_field('corrected_differential_phase', radar.fields.pop('PHIDP'), replace_existing=True)
+    radar.add_field('bringi_corrected_differential_phase', radar.fields.pop('PHIDP_BRINGI'), replace_existing=True)
+    radar.add_field('giangrande_corrected_differential_phase', radar.fields.pop('PHIDP_GG'), replace_existing=True)
+    # KDP
+    radar.add_field('specific_differential_phase', radar.fields.pop('KDP'), replace_existing=True)
+    radar.add_field('bringi_specific_differential_phase', radar.fields.pop('KDP_BRINGI'), replace_existing=True)
+    radar.add_field('giangrande_specific_differential_phase', radar.fields.pop('KDP_GG'), replace_existing=True)
+    # WIDTH
+    radar.add_field('spectrum_width', radar.fields.pop('WIDTH'), replace_existing=True)
+    # SNR
+    radar.add_field('signal_to_noise_ratio', radar.fields.pop('SNR'), replace_existing=True)
+
+    # radar.add_field('DBZ_RAW', radar.fields.pop('DBZ'), replace_existing=True)
+    # radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
+
+    # radar.add_field('ZDR', radar.fields.pop('ZDR_CORR'), replace_existing=True)
+    # radar.add_field('VEL_RAW', radar.fields.pop('VEL'), replace_existing=True)
+    # radar.add_field('VEL', radar.fields.pop('VEL_UNFOLDED'), replace_existing=True)
+    # try:
+    #     vdop_art = radar.fields['PHIDP_CORR']
+    #     radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
+    # except KeyError:
+    #     pass
+
+    # Plot check figure.
+    logger.info('Plotting figure')
+    try:
+        plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
+    except Exception:
+        logger.exception("Problem while trying to plot figure.")
+
     # Write results
     pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
     save_time = time.time()
@@ -373,8 +404,11 @@ def production_line(radar_file_name, outpath=None):
     # Deleting all unwanted keys for gridded product.
     logger.info("Gridding started.")
     unwanted_keys = []
-    goodkeys = ['ZDR', 'RHOHV', 'temperature', 'PHIDP_GG', 'KDP_GG',
-                'HYDRO', 'RAINFALL', 'D0', 'NW', 'DBZ_RAW', 'DBZ', 'VEL_RAW', 'VEL']
+    goodkeys = ['corrected_differential_reflectivity', 'cross_correlation_ratio',
+                'temperature', 'giangrande_corrected_differential_phase',
+                'giangrande_specific_differential_phase', 'radar_echo_classification',
+                'radar_estimated_rain_rate', 'D0', 'NW', 'total_power',
+                'corrected_reflectivity', 'velocity', 'corrected_velocity']
     for mykey in radar.fields.keys():
         if mykey not in goodkeys:
             unwanted_keys.append(mykey)
