@@ -63,6 +63,7 @@ def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
+
 def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     """
     Plot figure of old/new radar parameters for checking purpose.
@@ -332,19 +333,15 @@ def production_line(radar_file_name, outpath=None):
     end_time = time.time()
     logger.info("Treatment for %s done in %0.2f seconds.", os.path.basename(outfilename), (end_time - start_time))
 
-    # Hardcode mask
-    for mykey in radar.fields:
-        if mykey in ['temperature', 'height', 'SNR', 'NCP', 'HYDRO', 'DBZ_RAW']:
-            # Virgin fields that are left untouch.
-            continue
-        else:
-            radar.fields[mykey]['data'] = radar_codes.filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
-    logger.info('Hardcoding gatefilter to Fields done.')
-
     # Rename fields and remove unnecessary ones.
     try:
         vdop_art = radar.fields['PHIDP_CORR']
         radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
+    except KeyError:
+        pass
+    try:
+        vdop_art = radar.fields['VEL_CORR']
+        radar.fields.pop('VEL_CORR')
     except KeyError:
         pass
     try:
@@ -377,24 +374,22 @@ def production_line(radar_file_name, outpath=None):
     # SNR
     radar.add_field('signal_to_noise_ratio', radar.fields.pop('SNR'), replace_existing=True)
 
-    # radar.add_field('DBZ_RAW', radar.fields.pop('DBZ'), replace_existing=True)
-    # radar.add_field('DBZ', radar.fields.pop('DBZ_CORR'), replace_existing=True)
-
-    # radar.add_field('ZDR', radar.fields.pop('ZDR_CORR'), replace_existing=True)
-    # radar.add_field('VEL_RAW', radar.fields.pop('VEL'), replace_existing=True)
-    # radar.add_field('VEL', radar.fields.pop('VEL_UNFOLDED'), replace_existing=True)
-    # try:
-    #     vdop_art = radar.fields['PHIDP_CORR']
-    #     radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
-    # except KeyError:
-    #     pass
-
     # Plot check figure.
     logger.info('Plotting figure')
     try:
         plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
     except Exception:
         logger.exception("Problem while trying to plot figure.")
+
+    # Hardcode mask
+    for mykey in radar.fields:
+        if mykey in ['radar_echo_classification', 'temperature', 'height', 'signal_to_noise_ratio',
+                     'normalized_coherent_power', 'spectrum_width', 'total_power']:
+            # Virgin fields that are left untouch.
+            continue
+        else:
+            radar.fields[mykey]['data'] = radar_codes.filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
+    logger.info('Hardcoding gatefilter to Fields done.')
 
     # Write results
     pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
@@ -414,10 +409,15 @@ def production_line(radar_file_name, outpath=None):
             unwanted_keys.append(mykey)
     for mykey in unwanted_keys:
         radar.fields.pop(mykey)
-    # Gridding (and saving)
-    gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=OUTPATH_GRID)
-    gridding_codes.gridding_radar_70km(radar, radar_start_date, outpath=OUTPATH_GRID)
-    logger.info('Gridding done in %0.2f s.', (time.time() - save_time))
+
+    try:
+        # Gridding (and saving)
+        gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=OUTPATH_GRID)
+        gridding_codes.gridding_radar_70km(radar, radar_start_date, outpath=OUTPATH_GRID)
+        logger.info('Gridding done in %0.2f s.', (time.time() - save_time))
+    except Exception:
+        logging.error('Problem while gridding.')
+        raise
 
     # Processing finished!
     logger.info('%s processed in  %0.2f s.', os.path.basename(outfilename), (time.time() - start_time))
