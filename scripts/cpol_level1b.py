@@ -4,8 +4,8 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 24/04/2017
-@version: 0.8
+@date: 18/05/2017
+@version: 0.9
 
 .. autosummary::
     :toctree: generated/
@@ -145,17 +145,61 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     pl.savefig(outfile)  # Saving figure.
     pl.close()
 
-    # # HYDRO CLASSIFICATION
-    # hid_colors = ['White', 'LightBlue', 'MediumBlue', 'DarkOrange', 'LightPink',
-    #               'Cyan', 'DarkGray', 'Lime', 'Yellow', 'Red', 'Fuchsia']
-    # cmaphid = colors.ListedColormap(hid_colors)
-    #
-    # fig, ax0 = pl.subplots(1, 1, figsize = (6, 5))
-    # gr.plot_ppi('HYDRO', vmin=0, vmax=10, cmap=cmaphid)
-    # gr.cbs[-1] = adjust_fhc_colorbar_for_pyart(gr.cbs[-1])
-    # pl.savefig(outfile.replace(".png", "_HYDROCLASS.png"))
-
     return None
+
+
+def rename_radar_fields(radar):
+    """
+    Rename radar fields from their old name to the Py-ART default name.
+
+    Parameter:
+    ==========
+        radar:
+            Py-ART radar structure.
+
+    Returns:
+    ========
+        radar:
+            Py-ART radar structure.
+    """
+    fields_names = [('VEL', 'velocity'),
+                    ('VEL_UNFOLDED', 'corrected_velocity'),
+                    ('DBZ', 'total_power'),
+                    ('DBZ_CORR', 'corrected_reflectivity'),
+                    ('RHOHV_CORR', 'RHOHV'),
+                    ('RHOHV', 'cross_correlation_ratio'),
+                    ('ZDR', 'differential_reflectivity'),
+                    ('ZDR_CORR', 'corrected_differential_reflectivity'),
+                    ('PHIDP', 'corrected_differential_phase'),
+                    ('PHIDP_BRINGI', 'bringi_corrected_differential_phase'),
+                    ('PHIDP_GG', 'giangrande_corrected_differential_phase'),
+                    ('KDP', 'specific_differential_phase'),
+                    ('KDP_BRINGI', 'bringi_specific_differential_phase'),
+                    ('KDP_GG', 'giangrande_specific_differential_phase'),
+                    ('WIDTH', 'spectrum_width'),
+                    ('SNR', 'signal_to_noise_ratio'),
+                    ('NCP', 'normalized_coherent_power')]
+
+    # Try to remove occasional fields.
+    try:
+        vdop_art = radar.fields['PHIDP_CORR']
+        radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
+    except KeyError:
+        pass
+    try:
+        vdop_art = radar.fields['VEL_CORR']
+        radar.fields.pop('VEL_CORR')
+    except KeyError:
+        pass
+
+    # Parse array old_key, new_key
+    for old_key, new_key in fields_names:
+        try:
+            radar.add_field(new_key, radar.fields.pop(old_key), replace_existing=True)
+        except KeyError:
+            continue
+
+    return radar
 
 
 def production_line(radar_file_name, outpath=None):
@@ -329,50 +373,12 @@ def production_line(radar_file_name, outpath=None):
     # radar.add_field('IWC', ice_mass)
     # logger.info('Liquid/Ice mass estimated.')
 
+    # Rename fields to pyart defaults.
+    radar = rename_radar_fields(radar)
+
     # Treatment is finished!
     end_time = time.time()
     logger.info("Treatment for %s done in %0.2f seconds.", os.path.basename(outfilename), (end_time - start_time))
-
-    # Rename fields and remove unnecessary ones.
-    try:
-        vdop_art = radar.fields['PHIDP_CORR']
-        radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
-    except KeyError:
-        pass
-    try:
-        vdop_art = radar.fields['VEL_CORR']
-        radar.fields.pop('VEL_CORR')
-    except KeyError:
-        pass
-    try:
-        vdop_art = radar.fields['NCP']
-        radar.add_field('normalized_coherent_power', radar.fields.pop('NCP'), replace_existing=True)
-    except KeyError:
-        pass
-    # VEL
-    radar.add_field('velocity', radar.fields.pop('VEL'), replace_existing=True)
-    radar.add_field('corrected_velocity', radar.fields.pop('VEL_UNFOLDED'), replace_existing=True)
-    # DBZ
-    radar.add_field('total_power', radar.fields.pop('DBZ'), replace_existing=True)
-    radar.add_field('corrected_reflectivity', radar.fields.pop('DBZ_CORR'), replace_existing=True)
-    # RHOHV
-    radar.add_field('RHOHV', radar.fields.pop('RHOHV_CORR'), replace_existing=True)  # Remove RHOHV
-    radar.add_field('cross_correlation_ratio', radar.fields.pop('RHOHV'), replace_existing=True)
-    # ZDR
-    radar.add_field('differential_reflectivity', radar.fields.pop('ZDR'), replace_existing=True)
-    radar.add_field('corrected_differential_reflectivity', radar.fields.pop('ZDR_CORR'), replace_existing=True)
-    # PHIDP
-    radar.add_field('corrected_differential_phase', radar.fields.pop('PHIDP'), replace_existing=True)
-    radar.add_field('bringi_corrected_differential_phase', radar.fields.pop('PHIDP_BRINGI'), replace_existing=True)
-    radar.add_field('giangrande_corrected_differential_phase', radar.fields.pop('PHIDP_GG'), replace_existing=True)
-    # KDP
-    radar.add_field('specific_differential_phase', radar.fields.pop('KDP'), replace_existing=True)
-    radar.add_field('bringi_specific_differential_phase', radar.fields.pop('KDP_BRINGI'), replace_existing=True)
-    radar.add_field('giangrande_specific_differential_phase', radar.fields.pop('KDP_GG'), replace_existing=True)
-    # WIDTH
-    radar.add_field('spectrum_width', radar.fields.pop('WIDTH'), replace_existing=True)
-    # SNR
-    radar.add_field('signal_to_noise_ratio', radar.fields.pop('SNR'), replace_existing=True)
 
     # Plot check figure.
     logger.info('Plotting figure')
