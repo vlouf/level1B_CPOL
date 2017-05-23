@@ -628,18 +628,48 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=True, vel_name='VEL'):
         v_nyq_vel = np.max(np.abs(vdop_art))
 
     # Cf. mail from Bobby Jackson for skip_between_rays parameters.
-    if bobby_params:
-        vdop_vel = pyart.correct.dealias_region_based(radar,
-                                                      vel_field=vel_name,
-                                                      gatefilter=gf,
-                                                      nyquist_vel=v_nyq_vel,
-                                                      skip_between_rays=2000)
-    else:
-        vdop_vel = pyart.correct.dealias_region_based(radar,
-                                                      vel_field=vel_name,
-                                                      gatefilter=gf,
-                                                      nyquist_vel=v_nyq_vel)
+    # if bobby_params:
+    #     vdop_vel = pyart.correct.dealias_region_based(radar,
+    #                                                   vel_field=vel_name,
+    #                                                   gatefilter=gf,
+    #                                                   nyquist_vel=v_nyq_vel,
+    #                                                   skip_between_rays=2000)
+    # else:
+    #
+    vdop_vel = pyart.correct.dealias_region_based(radar, vel_field=vel_name, gatefilter=gf, nyquist_vel=v_nyq_vel)
 
     vdop_vel['units'] = "m/s"
+    vdop_vel['description'] = "Velocity unfolded using Py-ART region based dealiasing algorithm."
 
     return vdop_vel
+
+
+def unfold_velocity_bis(radar, my_gatefilter, vel_name='VEL'):
+    """
+    Unfold Doppler velocity using Py-ART the unwrap phase algorithm.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        my_gatefilter:
+            GateFilter
+        vel_name: str
+            Name of the (original) Doppler velocity field.
+
+    Returns:
+    ========
+        vel_dealias: dict
+            Unfolded Doppler velocity.
+    """
+    vel_dealias = pyart.correct.dealias_unwrap_phase(radar,
+                                           unwrap_unit='sweep',
+                                           keep_original=True,
+                                           skip_checks=True,
+                                           gatefilter=my_gatefilter,
+                                           vel_field=vel_name)
+
+    vel_dealias['units'] = "m/s"
+    vdop_vel['description'] = "Velocity unfolded using Py-ART dealias phase unwraping algorithm."
+
+    return vel_dealias

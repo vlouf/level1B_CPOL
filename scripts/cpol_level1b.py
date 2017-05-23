@@ -112,28 +112,26 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
 
     # Initializing figure.
     gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(6, 2, figsize=(12, 30), sharex=True, sharey=True)
+    fig, the_ax = pl.subplots(4, 3, figsize=(18, 20), sharex=True, sharey=True)
     the_ax = the_ax.flatten()
     # Plotting reflectivity
     gr.plot_ppi('total_power', ax = the_ax[0])
     gr.plot_ppi('corrected_reflectivity', ax = the_ax[1], gatefilter=gatefilter)
+    gr.plot_ppi('radar_echo_classification', ax = the_ax[2], gatefilter=gatefilter)
 
-    gr.plot_ppi('differential_reflectivity', ax = the_ax[2])
-    gr.plot_ppi('corrected_differential_reflectivity', ax = the_ax[3], gatefilter=gatefilter)
+    gr.plot_ppi('differential_reflectivity', ax = the_ax[3])
+    gr.plot_ppi('corrected_differential_reflectivity', ax = the_ax[4], gatefilter=gatefilter)
+    gr.plot_ppi('cross_correlation_ratio', ax = the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
 
-    gr.plot_ppi('corrected_differential_phase', ax = the_ax[4])
-    gr.plot_ppi('giangrande_corrected_differential_phase', ax = the_ax[5],
+    gr.plot_ppi('corrected_differential_phase', ax = the_ax[6])
+    gr.plot_ppi('giangrande_corrected_differential_phase', ax = the_ax[7],
                 gatefilter=gatefilter, vmin=-360, vmax=360,
                 cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
+    gr.plot_ppi('radar_estimated_rain_rate', ax = the_ax[8], gatefilter=gatefilter)
 
-    gr.plot_ppi('velocity', ax = the_ax[6])
-    gr.plot_ppi('corrected_velocity', ax = the_ax[7], gatefilter=gatefilter)
-
-    gr.plot_ppi('cross_correlation_ratio', ax = the_ax[8], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
-    gr.plot_ppi('radar_echo_classification', ax = the_ax[9])
-
-    gr.plot_ppi('NW', ax = the_ax[10], cmap='OrRd', vmin=0, vmax=8)
-    gr.plot_ppi('radar_estimated_rain_rate', ax = the_ax[11], gatefilter=gatefilter)
+    gr.plot_ppi('velocity', ax = the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+    gr.plot_ppi('corrected_velocity', ax = the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+    gr.plot_ppi('region_corrected_velocity', ax = the_ax[11], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
@@ -163,7 +161,8 @@ def rename_radar_fields(radar):
             Py-ART radar structure.
     """
     fields_names = [('VEL', 'velocity'),
-                    ('VEL_UNFOLDED', 'corrected_velocity'),
+                    ('VEL_UNFOLDED', 'region_corrected_velocity'),
+                    ('VEL_UNWRAP', 'corrected_velocity'),
                     ('DBZ', 'total_power'),
                     ('DBZ_CORR', 'corrected_reflectivity'),
                     ('RHOHV_CORR', 'RHOHV'),
@@ -335,6 +334,11 @@ def production_line(radar_file_name, outpath=None):
     radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing = True)
     logger.info('Doppler velocity unfolded.')
 
+    # This function will use the unwrap phase algorithm.
+    vdop_unfold = radar_codes.unfold_velocity_bis(radar, gatefilter)
+    radar.add_field('VEL_UNWRAP', vdop_unfold, replace_existing = True)
+    logger.info('Doppler velocity unwrapped.')
+
     # Correct Attenuation ZH
     atten_spec, zh_corr = atten_codes.correct_attenuation_zh(radar)
     radar.add_field_like('DBZ', 'DBZ_CORR', zh_corr, replace_existing=True)
@@ -389,7 +393,7 @@ def production_line(radar_file_name, outpath=None):
 
     # Hardcode mask
     for mykey in radar.fields:
-        if mykey in ['radar_echo_classification', 'temperature', 'height', 'signal_to_noise_ratio',
+        if mykey in ['temperature', 'height', 'signal_to_noise_ratio',
                      'normalized_coherent_power', 'spectrum_width', 'total_power']:
             # Virgin fields that are left untouch.
             continue
