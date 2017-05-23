@@ -4,8 +4,8 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 18/05/2017
-@version: 0.9
+@date: 23/05/2017
+@version: 0.99
 
 .. autosummary::
     :toctree: generated/
@@ -123,10 +123,12 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     gr.plot_ppi('corrected_differential_reflectivity', ax = the_ax[4], gatefilter=gatefilter)
     gr.plot_ppi('cross_correlation_ratio', ax = the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
 
-    gr.plot_ppi('corrected_differential_phase', ax = the_ax[6])
-    gr.plot_ppi('giangrande_corrected_differential_phase', ax = the_ax[7],
+    gr.plot_ppi('giangrande_corrected_differential_phase', ax = the_ax[6],
                 gatefilter=gatefilter, vmin=-360, vmax=360,
                 cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
+    gr.plot_ppi('giangrande_specific_differential_phase', ax = the_ax[7],
+                gatefilter=gatefilter, vmin=-360, vmax=360,
+                cmap=pyart.config.get_field_colormap('specific_differential_phase'))
     gr.plot_ppi('radar_estimated_rain_rate', ax = the_ax[8], gatefilter=gatefilter)
 
     gr.plot_ppi('velocity', ax = the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
@@ -297,14 +299,6 @@ def production_line(radar_file_name, outpath=None):
         radar.add_field('KDP', kdp_con, replace_existing=True)
         logger.info('KDP estimated.')
 
-    # Giangrande PHIDP/KDP
-    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar)
-    radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
-    radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
-    radar.fields['PHIDP_GG']['long_name'] = "giangrande_" + radar.fields['PHIDP_GG']['long_name']
-    radar.fields['KDP_GG']['long_name'] = "giangrande_" + radar.fields['KDP_GG']['long_name']
-    logger.info('KDP/PHIDP Giangrande estimated.')
-
     # Bringi PHIDP/KDP
     phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter)
     radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
@@ -313,6 +307,14 @@ def production_line(radar_file_name, outpath=None):
     radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_" + radar.fields['PHIDP_BRINGI']['long_name']
     radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
     logger.info('KDP/PHIDP Bringi estimated.')
+
+    # Giangrande PHIDP/KDP FIRST PASS
+    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, kdp_field='KDP_BRINGI')
+    radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
+    radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
+    radar.fields['PHIDP_GG']['long_name'] = "giangrande_" + radar.fields['PHIDP_GG']['long_name']
+    radar.fields['KDP_GG']['long_name'] = "giangrande_" + radar.fields['KDP_GG']['long_name']
+    logger.info('KDP/PHIDP Giangrande estimated.')
 
     # Unfold PHIDP, refold VELOCITY
     phidp_unfold, vdop_refolded = phase_codes.unfold_phidp_vdop(radar)
@@ -394,7 +396,8 @@ def production_line(radar_file_name, outpath=None):
     # Hardcode mask
     for mykey in radar.fields:
         if mykey in ['temperature', 'height', 'signal_to_noise_ratio',
-                     'normalized_coherent_power', 'spectrum_width', 'total_power']:
+                     'normalized_coherent_power', 'spectrum_width', 'total_power',
+                     'giangrande_corrected_differential_phase', 'giangrande_specific_differential_phase']:
             # Virgin fields that are left untouch.
             continue
         else:

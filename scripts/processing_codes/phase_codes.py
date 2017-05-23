@@ -167,7 +167,7 @@ def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHO
     """
     # Check if NCP field exist.
     try:
-        myradar.fields['NCP']
+        myradar.fields[ncp_field]
         radar = myradar
     except KeyError:
         # Create NCP field. The radar=deepcopy(myradar) is here so that the
@@ -178,7 +178,6 @@ def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHO
         tmp = np.zeros_like(radar.fields[rhv_field]['data']) + 1
         radar.add_field_like(rhv_field, ncp_field, tmp)  # Adding a fake NCP field.
 
-    # I don't have CYLP on Raijin, I need to use pyglpk.
     phidp_gg, kdp_gg = pyart.correct.phase_proc_lp(radar, 0.0,
         LP_solver='cylp', refl_field=refl_field, ncp_field=ncp_field,
         rhv_field=rhv_field, phidp_field=phidp_field, kdp_field=kdp_field)
