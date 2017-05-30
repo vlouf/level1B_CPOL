@@ -309,7 +309,7 @@ def production_line(radar_file_name, outpath=None):
     logger.info('KDP/PHIDP Bringi estimated.')
 
     # Giangrande PHIDP/KDP FIRST PASS
-    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, kdp_field='KDP_BRINGI')
+    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter)
     radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
     radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
     radar.fields['PHIDP_GG']['long_name'] = "giangrande_" + radar.fields['PHIDP_GG']['long_name']

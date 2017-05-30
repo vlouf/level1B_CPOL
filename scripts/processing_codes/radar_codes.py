@@ -627,6 +627,15 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=True, vel_name='VEL'):
     except:
         v_nyq_vel = np.max(np.abs(vdop_art))
 
+    # Cf. mail from Bobby Jackson for skip_between_rays parameters.
+    # if bobby_params:
+    #     vdop_vel = pyart.correct.dealias_region_based(radar,
+    #                                                   vel_field=vel_name,
+    #                                                   gatefilter=gf,
+    #                                                   nyquist_vel=v_nyq_vel,
+    #                                                   skip_between_rays=2000)
+    # else:
+    #
     vdop_vel = pyart.correct.dealias_region_based(radar, vel_field=vel_name, gatefilter=gf, nyquist_vel=v_nyq_vel)
 
     vdop_vel['units'] = "m/s"
@@ -661,6 +670,6 @@ def unfold_velocity_bis(radar, my_gatefilter, vel_name='VEL'):
                                            vel_field=vel_name)
 
     vel_dealias['units'] = "m/s"
-    vdop_vel['description'] = "Velocity unfolded using Py-ART dealias phase unwraping algorithm."
+    vel_dealias['description'] = "Velocity unfolded using Py-ART dealias phase unwraping algorithm."
 
     return vel_dealias

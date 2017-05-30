@@ -137,7 +137,8 @@ def estimate_kdp(radar, gatefilter, phidp_name='PHIDP'):
     return kdp_field
 
 
-def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHOHV', phidp_field='PHIDP', kdp_field='KDP'):
+def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
+                     rhv_field='RHOHV', phidp_field='PHIDP', kdp_field='KDP'):
     """
     Phase processing using the LP method in Py-ART. A LP solver is required,
     I only have pyglpk and cvxopt, that's why I'm specifying it while calling
@@ -165,28 +166,32 @@ def phidp_giangrande(myradar,  refl_field='DBZ', ncp_field='NCP', rhv_field='RHO
         kdp_gg: dict
             Field dictionary containing recalculated differential phases.
     """
-    # Check if NCP field exist.
+    def _filter_hardcoding(my_array, nuke_filter, bad=-9999):
+        # Hardcoding filter sub-function.
+        filt_array = np.ma.masked_where(nuke_filter.gate_excluded, my_array)
+        filt_array.set_fill_value(bad)
+        filt_array = filt_array.filled(fill_value=bad)
+        to_return = np.ma.masked_where(filt_array == bad, filt_array)
+        return to_return
+    # Deepcopy the radar structure.
+    radar = deepcopy(myradar)
     try:
-        myradar.fields[ncp_field]
-        radar = myradar
+        # Looking for an NCP field.
+        radar.fields[ncp_field]
     except KeyError:
         # Create NCP field. The radar=deepcopy(myradar) is here so that the
         # "fake" NCP field we're adding is temporary, i.e. it is not added to
         # the 'main' radar stucture but just a copy of it that will disappear
         # when this function returns.
-        radar = deepcopy(myradar)
         tmp = np.zeros_like(radar.fields[rhv_field]['data']) + 1
         radar.add_field_like(rhv_field, ncp_field, tmp)  # Adding a fake NCP field.
+
+    for mykey in [refl_field, ncp_field, rhv_field, phidp_field, kdp_field]:
+        radar.fields[mykey]['data'] = _filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
 
     phidp_gg, kdp_gg = pyart.correct.phase_proc_lp(radar, 0.0,
         LP_solver='cylp', refl_field=refl_field, ncp_field=ncp_field,
         rhv_field=rhv_field, phidp_field=phidp_field, kdp_field=kdp_field)
-
-    # Check if phidp_gg and kdp_gg are masked array.
-    if not np.ma.isMaskedArray(phidp_gg['data']):
-        phidp_gg['data'] = np.ma.masked_array(phidp_gg['data'])
-    if not np.ma.isMaskedArray(kdp_gg['data']):
-        kdp_gg['data'] = np.ma.masked_array(kdp_gg['data'])
 
     return phidp_gg, kdp_gg
 
