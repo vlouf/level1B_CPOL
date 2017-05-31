@@ -101,7 +101,7 @@ def _get_noise_threshold(filtered_data):
     """
     Compute the noise threshold.
     """
-    n, bins = np.histogram(filtered_data, bins = 150)
+    n, bins = np.histogram(filtered_data, bins=150)
     peaks = scipy.signal.find_peaks_cwt(n, np.array([10]))
     centers = bins[0:-1] + (bins[1] - bins[0])
     search_data = n[peaks[0]:peaks[1]]
@@ -332,12 +332,12 @@ def get_texture(radar, vel_field_name='VEL'):
     """
     nyq = radar.instrument_parameters['nyquist_velocity']['data'][0]
     vel = radar.fields[vel_field_name]['data']
-    data = ndimage.filters.generic_filter(vel, pyart.util.interval_std, size = (4,4), extra_arguments = (-nyq, nyq))
-    filtered_data = ndimage.filters.median_filter(data, size = (4,4))
+    data = ndimage.filters.generic_filter(vel, pyart.util.interval_std, size=(4, 4), extra_arguments=(-nyq, nyq))
+    filtered_data = ndimage.filters.median_filter(data, size=(4, 4))
 
     try:
         noise_threshold = _get_noise_threshold(filtered_data)
-    except:
+    except Exception:
         noise_threshold = np.NaN
         print("Could not determine the noise threshold")
 
@@ -406,8 +406,7 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     radar_T = radar.fields[temperature_name]['data']
     radar_z = radar.fields[height_name]['data']
 
-    scores = csu_fhc.csu_fhc_summer(dz=refl, zdr=zdr, rho=rhohv, kdp=kdp,
-        use_temp=True, band='C', T=radar_T)
+    scores = csu_fhc.csu_fhc_summer(dz=refl, zdr=zdr, rho=rhohv, kdp=kdp, use_temp=True, band='C', T=radar_T)
 
     hydro = np.argmax(scores, axis=0) + 1
     fill_value = -32768
@@ -417,7 +416,7 @@ def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                    "5: Wet Snow; 6: Vertical Ice; 7: LD Graupel; 8: HD Graupel; 9: Hail; 10: Big Drops"
 
     hydro_meta = {'data': hydro_data, 'units': ' ', 'long_name': 'Hydrometeor classification',
-                  'standard_name': 'Hydrometeor_ID', 'comments': the_comments }
+                  'standard_name': 'Hydrometeor_ID', 'comments': the_comments}
 
     return hydro_meta
 
@@ -452,13 +451,12 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     radar_T = radar.fields[temperature_name]['data']
     radar_z = radar.fields[height_name]['data']
 
-    liquid_water_mass, ice_mass = csu_liquid_ice_mass.calc_liquid_ice_mass(refl,
-        zdr, radar_z/1000, T=radar_T)
+    liquid_water_mass, ice_mass = csu_liquid_ice_mass.calc_liquid_ice_mass(refl, zdr, radar_z/1000, T=radar_T)
 
     liquid_water_mass = {'data': liquid_water_mass, 'units': 'g m-3',
-                        'long_name': 'Liquid Water Content',
-                        'standard_name': 'liquid_water_content',
-                        'description': "Liquid Water Content using Carey and Rutledge (2000) algorithm."}
+                         'long_name': 'Liquid Water Content',
+                         'standard_name': 'liquid_water_content',
+                         'description': "Liquid Water Content using Carey and Rutledge (2000) algorithm."}
     ice_mass = {'data': ice_mass, 'units': 'g m-3', 'long_name': 'Ice Water Content',
                 'standard_name': 'ice_water_content',
                 'description': "Ice Water Content using Carey and Rutledge (2000) algorithm."}
@@ -501,10 +499,10 @@ def rainfall_rate(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR', kdp_name='KD
     rain = np.ma.masked_where(np.isnan(rain), rain)
 
     rainrate = {"long_name": 'Blended Rainfall Rate',
-           "units": "mm h-1",
-           "standard_name": "Rainfall Rate",
-           "description": "Rainfall rate algorithm based on Thompson et al. 2016.",
-           "data": rain}
+                "units": "mm h-1",
+                "standard_name": "Rainfall Rate",
+                "description": "Rainfall rate algorithm based on Thompson et al. 2016.",
+                "data": rain}
 
     return rainrate
 
@@ -567,11 +565,11 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     my_profile = pyart.retrieve.fetch_radar_time_profile(interp_sonde, radar)
     z_dict, temp_dict = pyart.retrieve.map_profile_to_gates(temperatures, my_profile['height'], radar)
     temp_info_dict = {'data': temp_dict['data'],
-                 'long_name': 'Sounding temperature at gate',
-                 'standard_name' : 'temperature',
-                 'valid_min' : -100, 'valid_max' : 100,
-                 'units' : 'degrees Celsius',
-                 'comment': 'Radiosounding date: %s' % (radar_start_date.strftime("%Y/%m/%d"))}
+                      'long_name': 'Sounding temperature at gate',
+                      'standard_name': 'temperature',
+                      'valid_min': -100, 'valid_max': 100,
+                      'units': 'degrees Celsius',
+                      'comment': 'Radiosounding date: %s' % (radar_start_date.strftime("%Y/%m/%d"))}
 
     # Calculate SNR
     snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name)
@@ -625,7 +623,7 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=True, vel_name='VEL'):
     # Trying to determine Nyquist velocity
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
-    except:
+    except (KeyError, IndexError):
         v_nyq_vel = np.max(np.abs(vdop_art))
 
     # Cf. mail from Bobby Jackson for skip_between_rays parameters.
@@ -663,12 +661,8 @@ def unfold_velocity_bis(radar, my_gatefilter, vel_name='VEL'):
         vel_dealias: dict
             Unfolded Doppler velocity.
     """
-    vel_dealias = pyart.correct.dealias_unwrap_phase(radar,
-                                           unwrap_unit='sweep',
-                                           keep_original=True,
-                                           skip_checks=True,
-                                           gatefilter=my_gatefilter,
-                                           vel_field=vel_name)
+    vel_dealias = pyart.correct.dealias_unwrap_phase(radar, unwrap_unit='sweep', keep_original=True,
+                                                     skip_checks=True, gatefilter=my_gatefilter, vel_field=vel_name)
 
     vel_dealias['units'] = "m/s"
     vel_dealias['description'] = "Velocity unfolded using Py-ART dealias phase unwraping algorithm."

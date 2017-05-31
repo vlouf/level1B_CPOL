@@ -9,7 +9,7 @@ import pyart
 import numpy as np
 
 
-def compute_attenuation(kdp, alpha = 0.08, dr = 0.25):
+def compute_attenuation(kdp, alpha=0.08, dr=0.25):
     """
     Alpha is defined by Ah=alpha*Kdp, beta is defined by Ah-Av=beta*Kdp.
     From Bringi et al. (2003)

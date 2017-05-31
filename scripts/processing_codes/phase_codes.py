@@ -91,10 +91,9 @@ def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
 
     rng2d, az2d = np.meshgrid(radar.range['data'], radar.azimuth['data'])
     dr = (r[1] - r[0])  # m
-    window_size = dr/1000*4 # in km!!!
+    window_size = dr/1000*4  # in km!!!
 
-    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d/1000.0, gs=dr,
-        window=window_size, bad=-9999)
+    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d/1000.0, gs=dr, window=window_size, bad=-9999)
 
     fdN = np.ma.masked_where(fdN == -9999, fdN)
     kdN = np.ma.masked_where(kdN == -9999, kdN)
@@ -190,8 +189,12 @@ def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
         radar.fields[mykey]['data'] = _filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
 
     phidp_gg, kdp_gg = pyart.correct.phase_proc_lp(radar, 0.0,
-        LP_solver='cylp', refl_field=refl_field, ncp_field=ncp_field,
-        rhv_field=rhv_field, phidp_field=phidp_field, kdp_field=kdp_field)
+                                                   LP_solver='cylp',
+                                                   refl_field=refl_field,
+                                                   ncp_field=ncp_field,
+                                                   rhv_field=rhv_field,
+                                                   phidp_field=phidp_field,
+                                                   kdp_field=kdp_field)
 
     return phidp_gg, kdp_gg
 
@@ -228,7 +231,7 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
     vdop = radar.fields[vel_name]['data'].filled(np.NaN)
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
-    except:
+    except (KeyError, IndexError):
         v_nyq_vel = np.max(np.abs(vdop))
 
     # Create gatefilter on PHIDP Bringi (the unfolding is based upon PHIDP Bringi)
@@ -262,7 +265,7 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
         phidp = _unfold_phidp(deepcopy(phidp), posr, posazi)
         # Calculating the offset.
         tmp = deepcopy(phidp)
-        tmp[tmp < 0]  = np.NaN
+        tmp[tmp < 0] = np.NaN
         phidp_offset = np.nanmean(np.nanmin(tmp, axis=1))
         if phidp_offset < 0 or phidp_offset > 90:
             # Offset too big or too low to be true, therefore it is not applied.

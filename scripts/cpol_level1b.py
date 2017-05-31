@@ -33,7 +33,6 @@ from multiprocessing import Pool
 
 # Other Libraries -- Matplotlib must be imported first
 import matplotlib
-matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
 import matplotlib.colors as colors
 import matplotlib.pyplot as pl
 
@@ -107,25 +106,25 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     fig, the_ax = pl.subplots(4, 3, figsize=(18, 20), sharex=True, sharey=True)
     the_ax = the_ax.flatten()
     # Plotting reflectivity
-    gr.plot_ppi('total_power', ax = the_ax[0])
-    gr.plot_ppi('corrected_reflectivity', ax = the_ax[1], gatefilter=gatefilter)
-    gr.plot_ppi('radar_echo_classification', ax = the_ax[2], gatefilter=gatefilter)
+    gr.plot_ppi('total_power', ax=the_ax[0])
+    gr.plot_ppi('corrected_reflectivity', ax=the_ax[1], gatefilter=gatefilter)
+    gr.plot_ppi('radar_echo_classification', ax=the_ax[2], gatefilter=gatefilter)
 
-    gr.plot_ppi('differential_reflectivity', ax = the_ax[3])
-    gr.plot_ppi('corrected_differential_reflectivity', ax = the_ax[4], gatefilter=gatefilter)
-    gr.plot_ppi('cross_correlation_ratio', ax = the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
+    gr.plot_ppi('differential_reflectivity', ax=the_ax[3])
+    gr.plot_ppi('corrected_differential_reflectivity', ax=the_ax[4], gatefilter=gatefilter)
+    gr.plot_ppi('cross_correlation_ratio', ax=the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
 
-    gr.plot_ppi('giangrande_corrected_differential_phase', ax = the_ax[6],
+    gr.plot_ppi('giangrande_corrected_differential_phase', ax=the_ax[6],
                 gatefilter=gatefilter, vmin=-360, vmax=360,
                 cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
-    gr.plot_ppi('giangrande_specific_differential_phase', ax = the_ax[7],
+    gr.plot_ppi('giangrande_specific_differential_phase', ax=the_ax[7],
                 gatefilter=gatefilter, vmin=-5, vmax=10,
                 cmap=pyart.config.get_field_colormap('specific_differential_phase'))
-    gr.plot_ppi('radar_estimated_rain_rate', ax = the_ax[8], gatefilter=gatefilter)
+    gr.plot_ppi('radar_estimated_rain_rate', ax=the_ax[8], gatefilter=gatefilter)
 
-    gr.plot_ppi('velocity', ax = the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-    gr.plot_ppi('corrected_velocity', ax = the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-    gr.plot_ppi('region_corrected_velocity', ax = the_ax[11], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+    gr.plot_ppi('velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+    gr.plot_ppi('corrected_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+    gr.plot_ppi('region_corrected_velocity', ax=the_ax[11], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
@@ -230,7 +229,7 @@ def production_line(radar_file_name, outpath=None):
     # Read the input radar file.
     try:
         radar = pyart.io.read(radar_file_name)
-    except:
+    except Exception:
         logger.error("MAJOR ERROR: unable to read input file {}".format(radar_file_name))
         return None
 
@@ -254,18 +253,18 @@ def production_line(radar_file_name, outpath=None):
     except ValueError:
         logger.error("Impossible to compute SNR")
         return None
-    radar.add_field('temperature', temperature, replace_existing = True)
-    radar.add_field('height', height, replace_existing = True)
+    radar.add_field('temperature', temperature, replace_existing=True)
+    radar.add_field('height', height, replace_existing=True)
     try:
         radar.fields['SNR']
         logger.info('SNR already exists.')
     except KeyError:
-        radar.add_field('SNR', snr, replace_existing = True)
+        radar.add_field('SNR', snr, replace_existing=True)
         logger.info('SNR calculated.')
 
     # Correct RHOHV
     rho_corr = radar_codes.correct_rhohv(radar)
-    radar.add_field_like('RHOHV', 'RHOHV_CORR', rho_corr, replace_existing = True)
+    radar.add_field_like('RHOHV', 'RHOHV_CORR', rho_corr, replace_existing=True)
     logger.info('RHOHV corrected.')
 
     # Get velocity field texture and noise threshold. (~3min to execute this function)
@@ -325,12 +324,12 @@ def production_line(radar_file_name, outpath=None):
     # Unfold VELOCITY
     # This function will check if a 'VEL_CORR' field exists anyway.
     vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=refold_velocity)
-    radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing = True)
+    radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing=True)
     logger.info('Doppler velocity unfolded.')
 
     # This function will use the unwrap phase algorithm.
     vdop_unfold = radar_codes.unfold_velocity_bis(radar, gatefilter)
-    radar.add_field('VEL_UNWRAP', vdop_unfold, replace_existing = True)
+    radar.add_field('VEL_UNWRAP', vdop_unfold, replace_existing=True)
     logger.info('Doppler velocity unwrapped.')
 
     # Correct Attenuation ZH
@@ -566,7 +565,7 @@ if __name__ == '__main__':
     # Output directory for log files.
     LOG_FILE_PATH = "/short/kl02/vhl548/logfiles/"
     # Time in seconds for which each subprocess is allowed to live.
-    TIME_BEFORE_DEATH = 600 # seconds before killing process.
+    TIME_BEFORE_DEATH = 600  # seconds before killing process.
 
     # Check if paths exist.
     if not os.path.isdir(OUTPATH):
@@ -625,13 +624,13 @@ if __name__ == '__main__':
     try:
         datetime.datetime.strptime(START_DATE, "%Y%m%d")
         datetime.datetime.strptime(END_DATE, "%Y%m%d")
-    except:
+    except Exception:
         print("Did not understand the date format. Must be YYYYMMDD.")
         sys.exit()
 
     # Creating the general log file.
     logname = "cpol_level1b_from_{}_to_{}.log".format(START_DATE, END_DATE)
-    log_file_name =  os.path.join(LOG_FILE_PATH, logname)
+    log_file_name = os.path.join(LOG_FILE_PATH, logname)
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -640,6 +639,7 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     with warnings.catch_warnings():
+        matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
         # Just ignoring warning messages.
         warnings.simplefilter("ignore")
         main()
