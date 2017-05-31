@@ -4,7 +4,7 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 23/05/2017
+@date: 31/05/2017
 @version: 0.99
 
 .. autosummary::
@@ -12,8 +12,11 @@ CPOL Level 1b main production line.
 
     timeout_handler
     chunks
+    plot_figure_check
+    rename_radar_fields
     production_line
     production_line_manager
+    production_line_multiproc
     main
 """
 # Python Standard Library
@@ -25,6 +28,7 @@ import logging
 import argparse
 import datetime
 import warnings
+import traceback
 from multiprocessing import Pool
 
 # Other Libraries -- Matplotlib must be imported first
@@ -79,18 +83,6 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
         radar_date: datetime
             Datetime stucture of the radar data.
     """
-    def adjust_fhc_colorbar_for_pyart(cb):
-        """
-        adjust_fhc_colorbar_for_pyart
-        """
-        cb.set_ticks(np.arange(1.4, 10, 0.9))
-        cb.ax.set_yticklabels(['Drizzle', 'Rain', 'Ice Crystals', 'Aggregates',
-                               'Wet Snow', 'Vertical Ice', 'LD Graupel',
-                               'HD Graupel', 'Hail', 'Big Drops'])
-        cb.ax.set_ylabel('')
-        cb.ax.tick_params(length=0)
-        return cb
-
     # Extracting year and date.
     year = str(radar_date.year)
     datestr = radar_date.strftime("%Y%m%d")
@@ -438,9 +430,46 @@ def production_line(radar_file_name, outpath=None):
     return None
 
 
-def production_line_manager(mydate):
+def production_line_manager(radar_file_name, outpath=None):
     """
     The production line manager calls the production line and manages it ;-).
+    Buffer function that is used to catch any problem with the processing line
+    without screwing the whole multiprocessing stuff.
+
+    Parameters:
+    ===========
+        radar_file_name: str
+            Name of the input radar file.
+        outpath: str
+            Path for saving output data.
+    """
+    shortname = os.path.basename(radar_file_name)
+    # If we are stuck in the loop for more than TIME_BEFORE_DEATH seconds,
+    # it will raise a TimeoutException that will kill the current process
+    # and go to the next iteration.
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(TIME_BEFORE_DEATH)
+    try:
+        production_line(radar_file_name, outpath=None)
+    except TimeoutException:
+        # Treatment time was too long.
+        logging.error("Too much time taken to treat %s, killing process.", shortname)
+        return None  # Go to next iteration.
+    except Exception:
+        print("Exception in production line code:")
+        print("-"*60)
+        traceback.print_exc(file=sys.stdout)
+        print("-"*60)
+        logging.error("An error occured during the processing of %s", shortname)
+        return None
+    else:
+        signal.alarm(0)
+
+    return None
+
+
+def production_line_multiproc(mydate):
+    """
     It makes sure that input/output directories exist. This is where the
     multiprocessing is taken care of.
 
@@ -482,29 +511,16 @@ def production_line_manager(mydate):
         for cnt, onefile in enumerate(flist_slice):
             args_list[cnt] = (onefile, outdir)
 
-        # If we are stuck in the loop for more than TIME_BEFORE_DEATH seconds,
-        # it will raise a TimeoutException that will kill the current process
-        # and go to the next iteration.
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(TIME_BEFORE_DEATH)
-        try:
-            # Start multiprocessing.
-            with Pool(NCPU) as pool:
-                pool.starmap(production_line, args_list)
-        except TimeoutException:
-            # Treatment time was too long.
-            print("TOO MUCH TIME SPENT FROM %s to %s " % (flist_slice[0], flist_slice[-1]))
-            logger.error("TOO MUCH TIME SPENT FROM %s to %s " % (flist_slice[0], flist_slice[-1]))
-            continue  # Go to next iteration.
-        else:
-            signal.alarm(0)
+        # Start multiprocessing.
+        with Pool(NCPU) as pool:
+            pool.starmap(production_line_manager, args_list)
 
     return None
 
 
 def main():
     """
-    Just print a welcoming message and calls the production_line_manager.
+    Just print a welcoming message and calls the production_line_multiproc.
     """
     # Start with a welcome message.
     print("#"*79)
@@ -526,11 +542,7 @@ def main():
     date_range = pd.date_range(START_DATE, END_DATE)
     # One date at a time.
     for thedate in date_range:
-        try:
-            production_line_manager(thedate)
-        except Exception:
-            # Keeping track of any exceptions that may happen.
-            logger.exception("Received an error for %s", thedate.strftime("%Y%m%d"))
+        production_line_multiproc(thedate)
 
     return None
 
@@ -554,7 +566,7 @@ if __name__ == '__main__':
     # Output directory for log files.
     LOG_FILE_PATH = "/short/kl02/vhl548/logfiles/"
     # Time in seconds for which each subprocess is allowed to live.
-    TIME_BEFORE_DEATH = 1200 # seconds before killing process.
+    TIME_BEFORE_DEATH = 600 # seconds before killing process.
 
     # Check if paths exist.
     if not os.path.isdir(OUTPATH):

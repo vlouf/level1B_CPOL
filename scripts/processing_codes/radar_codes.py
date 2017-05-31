@@ -557,6 +557,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         radar_start_date = closest_date
         sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
 
+    print("Reading radiosounding %s" % (sonde_name))
     interp_sonde = netCDF4.Dataset(os.path.join(soundings_dir, sonde_name))
     temperatures = interp_sonde.variables['temp'][:]
     times = interp_sonde.variables['time'][:]
