@@ -127,7 +127,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
                 gatefilter=gatefilter, vmin=-360, vmax=360,
                 cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
     gr.plot_ppi('giangrande_specific_differential_phase', ax = the_ax[7],
-                gatefilter=gatefilter, vmin=-360, vmax=360,
+                gatefilter=gatefilter, vmin=-5, vmax=10,
                 cmap=pyart.config.get_field_colormap('specific_differential_phase'))
     gr.plot_ppi('radar_estimated_rain_rate', ax = the_ax[8], gatefilter=gatefilter)
 
