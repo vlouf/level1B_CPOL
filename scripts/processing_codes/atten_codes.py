@@ -37,8 +37,9 @@ def compute_attenuation(kdp, alpha=0.08, dr=0.25):
         kdp[np.isnan(kdp)] = 0
 
     kdp[:, :-40] = 0  # Removing the last gates because of artifacts created by the SOBEL window.
-    kdp[kdp < 0] = 0
-    kdp[kdp > 5] = 0
+    # Trusting Giangrande's algorithm...
+    # kdp[kdp < 0] = 0
+    # kdp[kdp > 5] = 0
 
     atten_specific = alpha*kdp  # Bringi relationship
     atten_specific[np.isnan(atten_specific)] = 0

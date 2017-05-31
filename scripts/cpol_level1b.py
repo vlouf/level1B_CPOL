@@ -194,7 +194,7 @@ def rename_radar_fields(radar):
     return radar
 
 
-def production_line(radar_file_name, outpath=None):
+def production_line(radar_file_name, outpath):
     """
     Production line for correcting and estimating CPOL data radar parameters.
     The naming convention for these parameters is assumed to be DBZ, ZDR, VEL,
@@ -214,8 +214,6 @@ def production_line(radar_file_name, outpath=None):
     # Correct an occasional mislabelling from RadX.
     if "SURV" in outfilename:
         outfilename = outfilename.replace("SURV", "PPI")
-    if outpath is None:
-        outpath = os.path.expanduser('~')
     outfilename = os.path.join(outpath, outfilename)
 
     # Check if output file already exists.
@@ -306,6 +304,8 @@ def production_line(radar_file_name, outpath=None):
     radar.fields['PHIDP_GG']['long_name'] = "giangrande_" + radar.fields['PHIDP_GG']['long_name']
     radar.fields['KDP_GG']['long_name'] = "giangrande_" + radar.fields['KDP_GG']['long_name']
     logger.info('KDP/PHIDP Giangrande estimated.')
+    if np.nanmax(kdp_gg['data'].flatten()) == 0:
+        logger.error("KDP Giangrande is null.")
 
     # Unfold PHIDP, refold VELOCITY
     phidp_unfold, vdop_refolded = phase_codes.unfold_phidp_vdop(radar)
@@ -429,7 +429,7 @@ def production_line(radar_file_name, outpath=None):
     return None
 
 
-def production_line_manager(radar_file_name, outpath=None):
+def production_line_manager(radar_file_name, outpath):
     """
     The production line manager calls the production line and manages it ;-).
     Buffer function that is used to catch any problem with the processing line
@@ -449,7 +449,7 @@ def production_line_manager(radar_file_name, outpath=None):
     signal.signal(signal.SIGALRM, timeout_handler)
     signal.alarm(TIME_BEFORE_DEATH)
     try:
-        production_line(radar_file_name, outpath=None)
+        production_line(radar_file_name, outpath)
     except TimeoutException:
         # Treatment time was too long.
         logging.error("Too much time taken to treat %s, killing process.", shortname)
