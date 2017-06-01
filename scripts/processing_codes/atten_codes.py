@@ -36,7 +36,7 @@ def compute_attenuation(kdp, alpha=0.08, dr=0.25):
     else:
         kdp[np.isnan(kdp)] = 0
 
-    kdp[:, :-40] = 0  # Removing the last gates because of artifacts created by the SOBEL window.
+    kdp[:, -40:] = 0  # Removing the last gates because of artifacts created by the SOBEL window.
     # Trusting Giangrande's algorithm...
     # kdp[kdp < 0] = 0
     # kdp[kdp > 5] = 0
@@ -75,8 +75,8 @@ def correct_attenuation_zdr(radar, zdr_name='ZDR_CORR', kdp_name='KDP_GG'):
             Attenuation corrected differential reflectivity.
     """
     r = radar.range['data']
-    zdr = radar.fields[zdr_name]['data']
-    kdp = radar.fields[kdp_name]['data']
+    zdr = deepcopy(radar.fields[zdr_name]['data'])
+    kdp = deepcopy(radar.fields[kdp_name]['data'])
 
     dr = (r[1] - r[0]) / 1000  # km
 
@@ -112,8 +112,8 @@ def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_GG'):
             Attenuation corrected reflectivity.
     """
     r = radar.range['data']
-    refl = radar.fields[refl_name]['data']
-    kdp = radar.fields[kdp_name]['data']
+    refl = deepcopy(radar.fields[refl_name]['data'])
+    kdp = deepcopy(radar.fields[kdp_name]['data'])
 
     dr = (r[1] - r[0]) / 1000  # km
 

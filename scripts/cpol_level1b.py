@@ -33,6 +33,7 @@ from multiprocessing import Pool
 
 # Other Libraries -- Matplotlib must be imported first
 import matplotlib
+matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
 import matplotlib.colors as colors
 import matplotlib.pyplot as pl
 
@@ -639,7 +640,6 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     with warnings.catch_warnings():
-        matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
         # Just ignoring warning messages.
         warnings.simplefilter("ignore")
         main()
