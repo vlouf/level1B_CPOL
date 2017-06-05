@@ -212,13 +212,6 @@ def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
         kdp_gg: dict
             Field dictionary containing recalculated differential phases.
     """
-    def _filter_hardcoding(my_array, nuke_filter, bad=-9999):
-        # Hardcoding filter sub-function.
-        filt_array = np.ma.masked_where(nuke_filter.gate_excluded, my_array)
-        filt_array.set_fill_value(bad)
-        filt_array = filt_array.filled(fill_value=bad)
-        to_return = np.ma.masked_where(filt_array == bad, filt_array)
-        return to_return
     # Deepcopy the radar structure.
     radar = deepcopy(myradar)
     try:
@@ -232,9 +225,6 @@ def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
         tmp = np.zeros_like(radar.fields[rhv_field]['data']) + 1
         radar.add_field_like(rhv_field, ncp_field, tmp)  # Adding a fake NCP field.
 
-    for mykey in [refl_field, ncp_field, rhv_field, phidp_field, kdp_field]:
-        radar.fields[mykey]['data'] = _filter_hardcoding(radar.fields[mykey]['data'], gatefilter)
-
     phidp_gg, kdp_gg = pyart.correct.phase_proc_lp(radar, 0.0,
                                                    LP_solver='cylp',
                                                    refl_field=refl_field,
@@ -244,6 +234,30 @@ def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
                                                    kdp_field=kdp_field)
 
     return phidp_gg, kdp_gg
+
+
+def refold_phidp(radar, phidp_name='PHIDP'):
+    """
+    Refold PHIDP.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        phidp_name: str
+            PHIDP field name.
+
+    Returns:
+    ========
+        phi: array
+            Refolded PHIDP.
+    """
+    phi = deepcopy(radar.fields[phidp_name]['data'])
+    pos = (phi > 80)
+    phi[pos] -= 90
+    phi[~pos] += 90
+
+    return phi
 
 
 def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI', vel_name='VEL'):

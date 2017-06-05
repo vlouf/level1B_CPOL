@@ -166,9 +166,11 @@ def rename_radar_fields(radar):
                     ('PHIDP', 'corrected_differential_phase'),
                     ('PHIDP_BRINGI', 'bringi_corrected_differential_phase'),
                     ('PHIDP_GG', 'giangrande_corrected_differential_phase'),
+                    ('PHIDP_SIM', 'simulated_differential_phase'),
                     ('KDP', 'specific_differential_phase'),
                     ('KDP_BRINGI', 'bringi_specific_differential_phase'),
                     ('KDP_GG', 'giangrande_specific_differential_phase'),
+                    ('KDP_SIM', 'simulated_specific_differential_phase'),
                     ('WIDTH', 'spectrum_width'),
                     ('SNR', 'signal_to_noise_ratio'),
                     ('NCP', 'normalized_coherent_power')]
@@ -279,8 +281,12 @@ def production_line(radar_file_name, outpath):
     corr_zdr = radar_codes.correct_zdr(radar)
     radar.add_field_like('ZDR', 'ZDR_CORR', corr_zdr, replace_existing=True)
 
+    # PHIDP refolded.
+    phidp_ref = phase_codes.refold_phidp(radar)
+    radar.add_field_like('PHIDP', 'PHIDP', phidp_ref, replace_existing=True)
+
     # KDP from disdrometer.
-    kdp_simu, phidp_simu = kdp_phidp_disdro_darwin(radar, refl_field="DBZ", zdr_field="ZDR")
+    kdp_simu, phidp_simu = phase_codes.kdp_phidp_disdro_darwin(radar, refl_field="DBZ", zdr_field="ZDR")
     radar.add_field('KDP_SIM', kdp_simu, replace_existing=True)
     radar.add_field('PHIDP_SIM', phidp_simu, replace_existing=True)
 
@@ -294,10 +300,13 @@ def production_line(radar_file_name, outpath):
         radar.add_field('KDP', kdp_con, replace_existing=True)
         logger.info('KDP estimated.')
 
-    # Bringi PHIDP/KDP 1st Pass
+    # Bringi PHIDP/KDP
     phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter)
     radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
+    radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_" + radar.fields['PHIDP_BRINGI']['long_name']
+    radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
+    logger.info('KDP/PHIDP Bringi estimated.')
 
     # Unfold PHIDP, refold VELOCITY
     phidp_unfold, vdop_refolded = phase_codes.unfold_phidp_vdop(radar)
@@ -313,16 +322,8 @@ def production_line(radar_file_name, outpath):
         radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
         radar.fields['VEL_CORR']['long_name'] = radar.fields['VEL_CORR']['long_name'] + "_refolded"
 
-    # Bringi PHIDP/KDP 2nd Pass
-    phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter, phidp_name='PHIDP_SIM')
-    radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
-    radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
-    radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_" + radar.fields['PHIDP_BRINGI']['long_name']
-    radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
-    logger.info('KDP/PHIDP Bringi estimated.')
-
     # Giangrande PHIDP/KDP
-    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP_BRINGI')
+    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP_SIM')
     radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
     radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
     radar.fields['PHIDP_GG']['long_name'] = "giangrande_" + radar.fields['PHIDP_GG']['long_name']
