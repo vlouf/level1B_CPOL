@@ -37,9 +37,9 @@ def compute_attenuation(kdp, alpha=0.08, dr=0.25):
         kdp[np.isnan(kdp)] = 0
 
     kdp[:, -40:] = 0  # Removing the last gates because of artifacts created by the SOBEL window.
-    # Trusting Giangrande's algorithm...
-    # kdp[kdp < 0] = 0
-    # kdp[kdp > 5] = 0
+    kdp[:, :40] = 0  # Removing gates because of artifacts created by the SOBEL window.
+    kdp[kdp < 0] = 0
+    kdp[kdp > 5] = 0
 
     atten_specific = alpha*kdp  # Bringi relationship
     atten_specific[np.isnan(atten_specific)] = 0
@@ -122,5 +122,42 @@ def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_GG'):
 
     atten_meta = {'data': atten_spec, 'units': 'dB/km', 'standard_name': 'specific_attenuation_zh',
                   'long_name': 'Reflectivity specific attenuation'}
+
+    return atten_meta, zh_corr
+
+
+def correct_attenuation_zh_pyart(myradar, refl_field='DBZ', ncp_field='NCP', rhv_field='RHOHV', phidp_field='PHIDP_GG'):
+    """
+    Correct attenuation on reflectivity. KDP_GG has been
+    cleaned of noise, that's why we use it.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_name: str
+            Reflectivity field name.
+        kdp_name: str
+            KDP field name.
+
+    Returns:
+    ========
+        atten_meta: dict
+            Specific attenuation.
+        zh_corr: array
+            Attenuation corrected reflectivity.
+    """
+    radar = deepcopy(radar)
+    try:
+        radar.fields[ncp_field]
+    except KeyError:
+        tmp = np.zeros_like(radar.fields[refl_field]['data']) + 1
+        radar.add_field_like(rhv_field, ncp_field, tmp)
+
+    atten_meta, zh_corr = pyart.correct.calculate_attenuation(radar, 0,
+                                                              refl_field=refl_field,
+                                                              ncp_field=ncp_field,
+                                                              rhv_field=rhv_field,
+                                                              phidp_field=phidp_field)
 
     return atten_meta, zh_corr

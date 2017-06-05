@@ -135,6 +135,53 @@ def estimate_kdp(radar, gatefilter, phidp_name='PHIDP'):
 
     return kdp_field
 
+def kdp_phidp_disdro_darwin(radar, refl_field="DBZ", zdr_field="ZDR"):
+    """
+    Estimating PHIDP and KDP using the self-consistency relationship.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        refl_field: str
+            Reflectivity field name.
+        zdr_field: str
+            Differential reflectivity field name.
+
+    Returns:
+    ========
+        kdp_field:
+            KDP estimation.
+        phidp_field:
+            PHIDP estimation
+    """
+    # Disdro relationship.
+    myfit = np.poly1d([-1.55277347e-06, 1.34659900e-05, -5.13632902e-05, 9.95614998e-05])
+
+    # Extract data
+    dbz = deepcopy(radar.fields[refl_field]['data'].filled(np.NaN))
+    zdr = deepcopy(radar.fields[zdr_field]['data'].filled(np.NaN))
+    r = radar.range['data']
+    dr = r[1] - r[0]
+
+    # Compute KDP
+    kdp =  10**(dbz/10.0) * myfit(zdr)
+    kdp[dbz > 50] = np.NaN  # Clutter
+    kdp[kdp < -2] = np.NaN
+    kdp = np.ma.masked_where(np.isnan(kdp), kdp)
+
+    phidp = dr/1000*np.nancumsum(kdp, axis=1)
+
+    phidp_field = pyart.config.get_metadata('differential_phase')
+    phidp_field['data'] = phidp
+    phidp_field["description"] = "Simulation using Darwin disdrometer."
+
+    kdp_field = {'data': kdp, 'units': 'degrees/km', 'standard_name': 'simulated_specific_differential_phase_hv',
+                 'long_name': 'Specific differential phase (KDP) simulated',
+                 "description": "Simulation using Darwin disdrometer."}
+
+    return kdp_field, phidp_field
+
 
 def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
                      rhv_field='RHOHV', phidp_field='PHIDP', kdp_field='KDP'):

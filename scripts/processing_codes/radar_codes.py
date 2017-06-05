@@ -661,8 +661,18 @@ def unfold_velocity_bis(radar, my_gatefilter, vel_name='VEL'):
         vel_dealias: dict
             Unfolded Doppler velocity.
     """
-    vel_dealias = pyart.correct.dealias_unwrap_phase(radar, unwrap_unit='sweep', keep_original=True,
-                                                     skip_checks=True, gatefilter=my_gatefilter, vel_field=vel_name)
+    try:
+        v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
+    except (KeyError, IndexError):
+        v_nyq_vel = np.max(np.abs(vdop_art))
+
+    vel_dealias = pyart.correct.dealias_unwrap_phase(radar,
+                                                     unwrap_unit='sweep',
+                                                     keep_original=True,
+                                                     nyquist_velocity=v_nyq_vel,
+                                                     skip_checks=True,
+                                                     gatefilter=my_gatefilter,
+                                                     vel_field=vel_name)
 
     vel_dealias['units'] = "m/s"
     vel_dealias['description'] = "Velocity unfolded using Py-ART dealias phase unwraping algorithm."
