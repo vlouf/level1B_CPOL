@@ -401,6 +401,8 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         plot_figure_check(radar, gatefilter, outfilename, radar_start_date, figure_path)
     except Exception:
         logger.exception("Problem while trying to plot figure.")
+    figure_time = time.time()
+    logger.info('Figure saved in %0.2fs.', (figure_time - end_time))
 
     # Hardcode mask
     for mykey in radar.fields:
@@ -416,7 +418,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # Write results
     pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
     save_time = time.time()
-    logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (save_time - end_time))
+    logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (save_time - figure_time))
 
     # Deleting all unwanted keys for gridded product.
     logger.info("Gridding started.")
