@@ -604,6 +604,7 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL'):
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
     except (KeyError, IndexError):
+        vdop_art = radar.fields[vel_name]['data']
         v_nyq_vel = np.max(np.abs(vdop_art))
 
     # Cf. mail from Bobby Jackson for skip_between_rays parameters.
