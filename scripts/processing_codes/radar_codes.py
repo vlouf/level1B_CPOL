@@ -600,14 +600,6 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL'):
         vdop_vel: dict
             Unfolded Doppler velocity.
     """
-    try:
-        # Looking for a folding-corrected velocity field.
-        vdop_art = radar.fields['VEL_CORR']['data']
-        vel_name = 'VEL_CORR'
-    except KeyError:
-        # Standard velocity field. No correction has been applied to it.
-        vdop_art = radar.fields[vel_name]['data']
-
     # Trying to determine Nyquist velocity
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]

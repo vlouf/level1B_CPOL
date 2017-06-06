@@ -343,7 +343,10 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
 
     # Unfold VELOCITY
     # This function will check if a 'VEL_CORR' field exists anyway.
-    vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=refold_velocity)
+    if refold_velocity:
+        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=refold_velocity, vel_name='VEL_CORR')
+    else:
+        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=refold_velocity, vel_name='VEL')
     radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing=True)
     logger.info('Doppler velocity unfolded.')
 

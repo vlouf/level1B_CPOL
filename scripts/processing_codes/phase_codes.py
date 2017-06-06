@@ -291,7 +291,7 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
     print("Found {} folded values".format(len(beam)))
     apos = np.unique(beam)
     # Excluding the first 20 km.
-    ray[ray <= 80] = 9999
+    ray[ray <= 80] = -9999
     # Initializing empty array.
     posr = []
     posazi = []
