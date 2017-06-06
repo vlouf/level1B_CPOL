@@ -97,7 +97,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
 
         gr.plot_ppi('corrected_velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
         gr.plot_ppi('region_dealias_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-        gr.plot_ppi('D0', ax=the_ax[11], gatefilter=gatefilter, cmap='pyart_Wild25', norm=colors.LogNorm(vmin=0.01, vmax=50))
+        gr.plot_ppi('D0', ax=the_ax[11], gatefilter=gatefilter, cmap='pyart_Wild25', vmin=0, vmax=20)
 
         for ax_sl in the_ax:
             gr.plot_range_rings([50, 100, 150], ax=ax_sl)
