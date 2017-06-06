@@ -287,8 +287,8 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
     gf.exclude_masked(phidp_bringi_name)
 
     # Looking for folded area of PHIDP
-    [beam, ray] = np.where(phidp_bringi < 0)
-    print("Found {} negative values".format(len(beam)))
+    [beam, ray] = np.where(phidp_bringi > 90)
+    print("Found {} folded values".format(len(beam)))
     apos = np.unique(beam)
     # Excluding the first 20 km.
     ray[ray <= 80] = 9999
@@ -310,16 +310,17 @@ def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI
         unfold_vel = False
     else:
         unfold_vel = True
-        phidp = _unfold_phidp(deepcopy(phidp), posr, posazi)
-        # Calculating the offset.
-        tmp = deepcopy(phidp)
-        tmp[tmp < 0] = np.NaN
-        phidp_offset = np.nanmean(np.nanmin(tmp, axis=1))
-        if phidp_offset < 0 or phidp_offset > 90:
-            # Offset too big or too low to be true, therefore it is not applied.
-            phidp_unfold = phidp
-        else:
-            phidp_unfold = phidp - phidp_offset
+        phidp_unfold = None
+        # # phidp = _unfold_phidp(deepcopy(phidp), posr, posazi)
+        # # Calculating the offset.
+        # tmp = deepcopy(phidp)
+        # tmp[tmp < 0] = np.NaN
+        # phidp_offset = np.nanmean(np.nanmin(tmp, axis=1))
+        # if phidp_offset < 0 or phidp_offset > 90:
+        #     # Offset too big or too low to be true, therefore it is not applied.
+        #     phidp_unfold = phidp
+        # else:
+        #     phidp_unfold = phidp - phidp_offset
 
     # Refold Doppler.
     if unfold_vel:
