@@ -247,83 +247,83 @@ def refold_phidp(radar, phidp_name='PHIDP'):
     return phi
 
 
-def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI', vel_name='VEL'):
-    """
-    Unfold PHIDP and refold Doppler velocity.
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        kdp_name:
-            KDP field name.
-        phidp_name: str
-            PHIDP field name.
-        vel_name: str
-            VEL field name.
-
-    Returns:
-    ========
-        phidp_unfold: dict
-            Unfolded PHIDP.
-        vdop_refolded: dict
-            Refolded Doppler velocity.
-    """
-    # Initialize returns
-    phidp_unfold = None
-    vdop_refolded = None
-
-    # Extract data
-    phidp = radar.fields[phidp_name]['data']
-    phidp_bringi = radar.fields[phidp_bringi_name]['data'].filled(np.NaN)
-    vdop = radar.fields[vel_name]['data'].filled(np.NaN)
-    try:
-        v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
-    except (KeyError, IndexError):
-        v_nyq_vel = np.max(np.abs(vdop))
-
-    # Create gatefilter on PHIDP Bringi (the unfolding is based upon PHIDP Bringi)
-    gf = pyart.filters.GateFilter(radar)
-    gf.exclude_masked(phidp_bringi_name)
-
-    # Looking for folded area of PHIDP
-    [beam, ray] = np.where(phidp_bringi > 90)
-    print("Found {} folded values".format(len(beam)))
-    apos = np.unique(beam)
-    # Excluding the first 20 km.
-    ray[ray <= 80] = -9999
-    # Initializing empty array.
-    posr = []
-    posazi = []
-    for onebeam in apos:
-        # We exclude "noise" value by only taking into account beams that have a
-        # significant amount of negative values (e.g. 5).
-        if len(beam[beam == onebeam]) < 5:
-            continue
-        else:
-            posr.append(np.nanmin(ray[beam == onebeam]))
-            posazi.append(onebeam)
-
-    # If there is no folding, Doppler does not have to be corrected.
-    if len(posr) == 0:
-        print("No posr found unfolding phidp")
-        unfold_vel = False
-    else:
-        unfold_vel = True
-        phidp_unfold = None
-        # # phidp = _unfold_phidp(deepcopy(phidp), posr, posazi)
-        # # Calculating the offset.
-        # tmp = deepcopy(phidp)
-        # tmp[tmp < 0] = np.NaN
-        # phidp_offset = np.nanmean(np.nanmin(tmp, axis=1))
-        # if phidp_offset < 0 or phidp_offset > 90:
-        #     # Offset too big or too low to be true, therefore it is not applied.
-        #     phidp_unfold = phidp
-        # else:
-        #     phidp_unfold = phidp - phidp_offset
-
-    # Refold Doppler.
-    if unfold_vel:
-        vdop_refolded = _refold_vdop(deepcopy(vdop), v_nyq_vel, posr, posazi)
-
-    return phidp_unfold, vdop_refolded
+# def unfold_phidp_vdop(radar, phidp_name='PHIDP', phidp_bringi_name='PHIDP_BRINGI', vel_name='VEL'):
+#     """
+#     Unfold PHIDP and refold Doppler velocity.
+#
+#     Parameters:
+#     ===========
+#         radar:
+#             Py-ART radar structure.
+#         kdp_name:
+#             KDP field name.
+#         phidp_name: str
+#             PHIDP field name.
+#         vel_name: str
+#             VEL field name.
+#
+#     Returns:
+#     ========
+#         phidp_unfold: dict
+#             Unfolded PHIDP.
+#         vdop_refolded: dict
+#             Refolded Doppler velocity.
+#     """
+#     # Initialize returns
+#     phidp_unfold = None
+#     vdop_refolded = None
+#
+#     # Extract data
+#     phidp = radar.fields[phidp_name]['data']
+#     phidp_bringi = radar.fields[phidp_bringi_name]['data'].filled(np.NaN)
+#     vdop = radar.fields[vel_name]['data'].filled(np.NaN)
+#     try:
+#         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
+#     except (KeyError, IndexError):
+#         v_nyq_vel = np.max(np.abs(vdop))
+#
+#     # Create gatefilter on PHIDP Bringi (the unfolding is based upon PHIDP Bringi)
+#     gf = pyart.filters.GateFilter(radar)
+#     gf.exclude_masked(phidp_bringi_name)
+#
+#     # Looking for folded area of PHIDP
+#     [beam, ray] = np.where(phidp_bringi > 90)
+#     print("Found {} folded values".format(len(beam)))
+#     apos = np.unique(beam)
+#     # Excluding the first 20 km.
+#     ray[ray <= 80] = -9999
+#     # Initializing empty array.
+#     posr = []
+#     posazi = []
+#     for onebeam in apos:
+#         # We exclude "noise" value by only taking into account beams that have a
+#         # significant amount of negative values (e.g. 5).
+#         if len(beam[beam == onebeam]) < 5:
+#             continue
+#         else:
+#             posr.append(np.nanmin(ray[beam == onebeam]))
+#             posazi.append(onebeam)
+#
+#     # If there is no folding, Doppler does not have to be corrected.
+#     if len(posr) == 0:
+#         print("No posr found unfolding phidp")
+#         unfold_vel = False
+#     else:
+#         unfold_vel = True
+#         phidp_unfold = None
+#         # # phidp = _unfold_phidp(deepcopy(phidp), posr, posazi)
+#         # # Calculating the offset.
+#         # tmp = deepcopy(phidp)
+#         # tmp[tmp < 0] = np.NaN
+#         # phidp_offset = np.nanmean(np.nanmin(tmp, axis=1))
+#         # if phidp_offset < 0 or phidp_offset > 90:
+#         #     # Offset too big or too low to be true, therefore it is not applied.
+#         #     phidp_unfold = phidp
+#         # else:
+#         #     phidp_unfold = phidp - phidp_offset
+#
+#     # Refold Doppler.
+#     if unfold_vel:
+#         vdop_refolded = _refold_vdop(deepcopy(vdop), v_nyq_vel, posr, posazi)
+#
+#     return phidp_unfold, vdop_refolded

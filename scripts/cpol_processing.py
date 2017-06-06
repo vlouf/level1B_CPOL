@@ -95,10 +95,9 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
                     cmap=pyart.config.get_field_colormap('specific_differential_phase'))
         gr.plot_ppi('radar_estimated_rain_rate', ax=the_ax[8], gatefilter=gatefilter)
 
-        gr.plot_ppi('velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-        gr.plot_ppi('region_corrected_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-        gr.plot_ppi('D0', ax=the_ax[11], gatefilter=gatefilter, cmap='jet', vmin=0, vmax=20)
-        # gr.plot_ppi('region_corrected_velocity', ax=the_ax[11], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+        gr.plot_ppi('corrected_velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+        gr.plot_ppi('region_dealias_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+        gr.plot_ppi('D0', ax=the_ax[11], gatefilter=gatefilter, cmap='pyart_Wild25', norm=colors.LogNorm(vmin=0.01, vmax=50))
 
         for ax_sl in the_ax:
             gr.plot_range_rings([50, 100, 150], ax=ax_sl)
@@ -126,8 +125,9 @@ def get_field_names():
             Containing [(old key, new key), ...]
     """
     fields_names = [('VEL', 'velocity'),
-                    ('VEL_UNFOLDED', 'region_corrected_velocity'),
-                    ('VEL_UNWRAP', 'corrected_velocity'),
+                    ('VEL_CORR', 'corrected_velocity')
+                    ('VEL_UNFOLDED', 'region_dealias_velocity'),
+                    ('VEL_UNWRAP', 'dealias_velocity'),
                     ('DBZ', 'total_power'),
                     ('DBZ_CORR', 'corrected_reflectivity'),
                     ('RHOHV_CORR', 'RHOHV'),
@@ -319,20 +319,6 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
     logger.info('KDP/PHIDP Bringi estimated.')
 
-    # Unfold PHIDP, refold VELOCITY
-    phidp_unfold, vdop_refolded = phase_codes.unfold_phidp_vdop(radar)
-    if phidp_unfold is not None:
-        logger.info('PHIDP has been unfolded.')
-        radar.add_field_like('PHIDP', 'PHIDP_CORR', phidp_unfold, replace_existing=True)
-    # Check if velocity was refolded.
-    if vdop_refolded is None:
-        refold_velocity = False
-    else:
-        refold_velocity = True
-        logger.info('Doppler velocity has been refolded.')
-        radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
-        radar.fields['VEL_CORR']['long_name'] = radar.fields['VEL_CORR']['long_name'] + "_refolded"
-
     # Giangrande PHIDP/KDP
     phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP_SIM')
     radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
@@ -341,12 +327,20 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.fields['KDP_GG']['long_name'] = "giangrande_" + radar.fields['KDP_GG']['long_name']
     logger.info('KDP/PHIDP Giangrande estimated.')
 
+    # Refold VELOCITY using unfolded PHIDP
+    vel_refolded, is_refolded = radar_codes.refold_velocity(radar)
+    # Check if velocity was refolded.
+    if is_refolded:
+        logger.info('Doppler velocity has been refolded.')
+        radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
+        radar.fields['VEL_CORR']['long_name'] = radar.fields['VEL_CORR']['long_name'] + "_refolded"
+
     # Unfold VELOCITY
     # This function will check if a 'VEL_CORR' field exists anyway.
-    if refold_velocity:
-        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=refold_velocity, vel_name='VEL_CORR')
+    if is_refolded:
+        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=is_refolded, vel_name='VEL_CORR')
     else:
-        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=refold_velocity, vel_name='VEL')
+        vdop_unfold = radar_codes.unfold_velocity(radar, gatefilter, bobby_params=is_refolded, vel_name='VEL')
     radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing=True)
     logger.info('Doppler velocity unfolded.')
 
@@ -356,8 +350,12 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # logger.info('Doppler velocity unwrapped.')
 
     # Correct Attenuation ZH
-    logger.info("Starting computation of attenuation")
-    atten_spec, zh_corr = atten_codes.correct_attenuation_zh(radar)
+    # logger.info("Starting computation of attenuation")
+    # atten_spec, zh_corr = atten_codes.correct_attenuation_zh(radar)
+    # radar.add_field('DBZ_CORR', zh_corr, replace_existing=True)
+    # radar.add_field('specific_attenuation_reflectivity', atten_spec, replace_existing=True)
+    # logger.info('Attenuation on reflectivity corrected.')
+    atten_spec, zh_corr = atten_codes.correct_attenuation_zh_pyart(radar)
     radar.add_field('DBZ_CORR', zh_corr, replace_existing=True)
     radar.add_field('specific_attenuation_reflectivity', atten_spec, replace_existing=True)
     logger.info('Attenuation on reflectivity corrected.')
@@ -436,7 +434,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     goodkeys = ['corrected_differential_reflectivity', 'cross_correlation_ratio',
                 'temperature', 'giangrande_corrected_differential_phase',
                 'radar_echo_classification', 'radar_estimated_rain_rate', 'D0',
-                'NW', 'corrected_reflectivity', 'velocity', 'region_corrected_velocity']
+                'NW', 'corrected_reflectivity', 'corrected_velocity', 'region_dealias_velocity']
     for mykey in radar.fields.keys():
         if mykey not in goodkeys:
             unwanted_keys.append(mykey)

@@ -499,6 +499,28 @@ def rainfall_rate(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR', kdp_name='KD
     return rainrate
 
 
+def refold_velocity(radar, vel_name='VEL', phidp_name="PHIDP"):
+    phi = radar.fields[phidp_name]['data']
+    vel = deepcopy(radar.fields[vel_name]['data'])
+
+    try:
+        v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
+    except (KeyError, IndexError):
+        v_nyq_vel = np.max(np.abs(vel))
+
+    pos = phi < -0.5
+    pos0 = vel > 0
+    pos1 = vel < 0
+    vel[(pos & pos0)] -= v_nyq_vel
+    vel[(pos & pos1)] += v_nyq_vel
+
+    is_refolded = False
+    if (np.sum(pos & pos0) > 0) or (np.sum(pos & pos1) > 0):
+        is_refolded = True
+
+    return vel, is_refolded
+
+
 def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     """
     Compute the signal-to-noise ratio as well as interpolating the radiosounding
