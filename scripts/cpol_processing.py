@@ -15,6 +15,7 @@ CPOL Level 1b main production line.
     production_line
 """
 # Python Standard Library
+# import gc
 import os
 import time
 import logging
@@ -106,7 +107,8 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
 
     pl.tight_layout()
     pl.savefig(outfile)  # Saving figure.
-    pl.close()
+    fig.clf()  # Clear figure
+    pl.close()  # Release memory
 
     return None
 
