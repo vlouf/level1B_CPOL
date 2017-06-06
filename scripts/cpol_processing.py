@@ -125,7 +125,7 @@ def get_field_names():
             Containing [(old key, new key), ...]
     """
     fields_names = [('VEL', 'velocity'),
-                    ('VEL_CORR', 'corrected_velocity')
+                    ('VEL_CORR', 'corrected_velocity'),
                     ('VEL_UNFOLDED', 'region_dealias_velocity'),
                     ('VEL_UNWRAP', 'dealias_velocity'),
                     ('DBZ', 'total_power'),
