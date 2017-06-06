@@ -35,7 +35,6 @@ import numpy as np
 from processing_codes import radar_codes
 from processing_codes import atten_codes
 from processing_codes import phase_codes
-from processing_codes import raijin_tools
 from processing_codes import gridding_codes
 
 
