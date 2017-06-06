@@ -332,7 +332,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # Check if velocity was refolded.
     if is_refolded:
         logger.info('Doppler velocity has been refolded.')
-        radar.add_field_like('VEL', 'VEL_CORR', vdop_refolded, replace_existing=True)
+        radar.add_field_like('VEL', 'VEL_CORR', vel_refolded, replace_existing=True)
         radar.fields['VEL_CORR']['long_name'] = radar.fields['VEL_CORR']['long_name'] + "_refolded"
 
     # Unfold VELOCITY
