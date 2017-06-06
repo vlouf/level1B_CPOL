@@ -126,7 +126,7 @@ def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_GG'):
     return atten_meta, zh_corr
 
 
-def correct_attenuation_zh_pyart(myradar, refl_field='DBZ', ncp_field='NCP', rhv_field='RHOHV', phidp_field='PHIDP_GG'):
+def correct_attenuation_zh_pyart(radar, refl_field='DBZ', ncp_field='NCP', rhv_field='RHOHV', phidp_field='PHIDP_GG'):
     """
     Correct attenuation on reflectivity. KDP_GG has been
     cleaned of noise, that's why we use it.
@@ -147,13 +147,6 @@ def correct_attenuation_zh_pyart(myradar, refl_field='DBZ', ncp_field='NCP', rhv
         zh_corr: array
             Attenuation corrected reflectivity.
     """
-    radar = deepcopy(radar)
-    try:
-        radar.fields[ncp_field]
-    except KeyError:
-        tmp = np.zeros_like(radar.fields[refl_field]['data']) + 1
-        radar.add_field_like(rhv_field, ncp_field, tmp)
-
     atten_meta, zh_corr = pyart.correct.calculate_attenuation(radar, 0,
                                                               refl_field=refl_field,
                                                               ncp_field=ncp_field,

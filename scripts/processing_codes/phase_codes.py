@@ -183,7 +183,7 @@ def kdp_phidp_disdro_darwin(radar, refl_field="DBZ", zdr_field="ZDR"):
     return kdp_field, phidp_field
 
 
-def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
+def phidp_giangrande(radar, gatefilter, refl_field='DBZ', ncp_field='NCP',
                      rhv_field='RHOHV', phidp_field='PHIDP', kdp_field='KDP'):
     """
     Phase processing using the LP method in Py-ART. A LP solver is required,
@@ -192,7 +192,7 @@ def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
 
     Parameters:
     ===========
-        myradar:
+        radar:
             Py-ART radar structure.
         refl_field: str
             Reflectivity field name.
@@ -212,19 +212,6 @@ def phidp_giangrande(myradar, gatefilter, refl_field='DBZ', ncp_field='NCP',
         kdp_gg: dict
             Field dictionary containing recalculated differential phases.
     """
-    # Deepcopy the radar structure.
-    radar = deepcopy(myradar)
-    try:
-        # Looking for an NCP field.
-        radar.fields[ncp_field]
-    except KeyError:
-        # Create NCP field. The radar=deepcopy(myradar) is here so that the
-        # "fake" NCP field we're adding is temporary, i.e. it is not added to
-        # the 'main' radar stucture but just a copy of it that will disappear
-        # when this function returns.
-        tmp = np.zeros_like(radar.fields[rhv_field]['data']) + 1
-        radar.add_field_like(rhv_field, ncp_field, tmp)  # Adding a fake NCP field.
-
     phidp_gg, kdp_gg = pyart.correct.phase_proc_lp(radar, 0.0,
                                                    LP_solver='cylp',
                                                    refl_field=refl_field,

@@ -4,32 +4,21 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 31/05/2017
+@date: 6/06/2017
 @version: 0.99
 
 .. autosummary::
     :toctree: generated/
 
-    timeout_handler
-    chunks
     plot_figure_check
     rename_radar_fields
     production_line
-    production_line_manager
-    production_line_multiproc
-    main
 """
 # Python Standard Library
 import os
-import sys
 import time
-import signal
 import logging
-import argparse
 import datetime
-import warnings
-import traceback
-from multiprocessing import Pool
 
 # Other Libraries -- Matplotlib must be imported first
 import matplotlib
@@ -39,9 +28,7 @@ import matplotlib.pyplot as pl
 
 import pyart
 import netCDF4
-import crayons  # For the welcoming message only.
 import numpy as np
-import pandas as pd
 
 # Custom modules.
 from processing_codes import radar_codes
@@ -51,24 +38,7 @@ from processing_codes import raijin_tools
 from processing_codes import gridding_codes
 
 
-class TimeoutException(Exception):   # Custom exception class
-    pass
-
-
-def timeout_handler(signum, frame):   # Custom signal handler
-    raise TimeoutException
-
-
-def chunks(l, n):
-    """
-    Yield successive n-sized chunks from l.
-    From http://stackoverflow.com/a/312464
-    """
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
-
-
-def plot_figure_check(radar, gatefilter, outfilename, radar_date):
+def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
     """
     Plot figure of old/new radar parameters for checking purpose.
 
@@ -87,11 +57,11 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     year = str(radar_date.year)
     datestr = radar_date.strftime("%Y%m%d")
     # Path for saving Figures.
-    outfile_path = os.path.join(FIGURE_CHECK_PATH, year, datestr)
+    outfile_path = os.path.join(figure_path, year, datestr)
 
     # Checking if output directory exists. Creating them otherwise.
-    if not os.path.isdir(os.path.join(FIGURE_CHECK_PATH, year)):
-        os.mkdir(os.path.join(FIGURE_CHECK_PATH, year))
+    if not os.path.isdir(os.path.join(figure_path, year)):
+        os.mkdir(os.path.join(figure_path, year))
     if not os.path.isdir(outfile_path):
         os.mkdir(outfile_path)
 
@@ -124,8 +94,9 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date):
     gr.plot_ppi('radar_estimated_rain_rate', ax=the_ax[8], gatefilter=gatefilter)
 
     gr.plot_ppi('velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-    gr.plot_ppi('corrected_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-    gr.plot_ppi('region_corrected_velocity', ax=the_ax[11], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+    gr.plot_ppi('region_corrected_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+    gr.plot_ppi('D0', ax=the_ax[11], gatefilter=gatefilter, cmap='jet', vmin=0, vmax=20)
+    # gr.plot_ppi('region_corrected_velocity', ax=the_ax[11], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
 
     for ax_sl in the_ax:
         gr.plot_range_rings([50, 100, 150], ax=ax_sl)
@@ -197,7 +168,7 @@ def rename_radar_fields(radar):
     return radar
 
 
-def production_line(radar_file_name, outpath):
+def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_dir):
     """
     Production line for correcting and estimating CPOL data radar parameters.
     The naming convention for these parameters is assumed to be DBZ, ZDR, VEL,
@@ -210,7 +181,15 @@ def production_line(radar_file_name, outpath):
             Name of the input radar file.
         outpath: str
             Path for saving output data.
+        outpath_grid: str
+            Path for saving gridded data.
+        figure_path: str
+            Path for saving figures.
+        sound_dir: str
+            Path to radiosoundings directory.
     """
+    # Get logger.
+    logger = logging.getLogger()
     # Generate output file name.
     outfilename = os.path.basename(radar_file_name)
     outfilename = outfilename.replace("level1a", "level1b")
@@ -248,9 +227,18 @@ def production_line(radar_file_name, outpath):
     datestr = radar_start_date.strftime("%Y%m%d_%H%M")
     logger.info("%s read.", radar_file_name)
 
+    # Looking for NCP field
+    try:
+        radar.fields['NCP']
+        fake_ncp = False
+    except KeyError:
+        tmp = np.zeros_like(radar.fields['DBZ']) + 1
+        radar.add_field_like('RHOHV', 'NCP', tmp)
+        fake_ncp = True
+
     # Compute SNR
     try:
-        height, temperature, snr = radar_codes.snr_and_sounding(radar, SOUND_DIR)
+        height, temperature, snr = radar_codes.snr_and_sounding(radar, sound_dir)
     except ValueError:
         logger.error("Impossible to compute SNR")
         return None
@@ -337,11 +325,12 @@ def production_line(radar_file_name, outpath):
     logger.info('Doppler velocity unfolded.')
 
     # This function will use the unwrap phase algorithm.
-    vdop_unfold = radar_codes.unfold_velocity_bis(radar, gatefilter)
-    radar.add_field('VEL_UNWRAP', vdop_unfold, replace_existing=True)
-    logger.info('Doppler velocity unwrapped.')
+    # vdop_unfold = radar_codes.unfold_velocity_bis(radar, gatefilter)
+    # radar.add_field('VEL_UNWRAP', vdop_unfold, replace_existing=True)
+    # logger.info('Doppler velocity unwrapped.')
 
     # Correct Attenuation ZH
+    logger.info("Starting computation of attenuation")
     atten_spec, zh_corr = atten_codes.correct_attenuation_zh_pyart(radar)
     radar.add_field_like('DBZ', 'DBZ_CORR', zh_corr, replace_existing=True)
     radar.add_field('specific_attenuation_reflectivity', atten_spec, replace_existing=True)
@@ -379,6 +368,10 @@ def production_line(radar_file_name, outpath):
     # radar.add_field('IWC', ice_mass)
     # logger.info('Liquid/Ice mass estimated.')
 
+    # Check if NCP field is fake.
+    if fake_ncp:
+        radar.fields.pop('NCP')
+
     # Rename fields to pyart defaults.
     radar = rename_radar_fields(radar)
 
@@ -389,7 +382,7 @@ def production_line(radar_file_name, outpath):
     # Plot check figure.
     logger.info('Plotting figure')
     try:
-        plot_figure_check(radar, gatefilter, outfilename, radar_start_date)
+        plot_figure_check(radar, gatefilter, outfilename, radar_start_date, figure_path)
     except Exception:
         logger.exception("Problem while trying to plot figure.")
 
@@ -414,9 +407,9 @@ def production_line(radar_file_name, outpath):
     unwanted_keys = []
     goodkeys = ['corrected_differential_reflectivity', 'cross_correlation_ratio',
                 'temperature', 'giangrande_corrected_differential_phase',
-                'giangrande_specific_differential_phase', 'radar_echo_classification',
-                'radar_estimated_rain_rate', 'D0', 'NW', 'total_power',
-                'corrected_reflectivity', 'velocity', 'corrected_velocity']
+                'radar_echo_classification', 'radar_estimated_rain_rate', 'D0',
+                'NW', 'total_power', 'corrected_reflectivity', 'velocity',
+                'region_corrected_velocity']
     for mykey in radar.fields.keys():
         if mykey not in goodkeys:
             unwanted_keys.append(mykey)
@@ -425,8 +418,8 @@ def production_line(radar_file_name, outpath):
 
     try:
         # Gridding (and saving)
-        gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=OUTPATH_GRID)
-        gridding_codes.gridding_radar_70km(radar, radar_start_date, outpath=OUTPATH_GRID)
+        gridding_codes.gridding_radar_150km(radar, radar_start_date, outpath=outpath_grid)
+        gridding_codes.gridding_radar_70km(radar, radar_start_date, outpath=outpath_grid)
         logger.info('Gridding done in %0.2f s.', (time.time() - save_time))
     except Exception:
         logging.error('Problem while gridding.')
@@ -436,218 +429,3 @@ def production_line(radar_file_name, outpath):
     logger.info('%s processed in  %0.2f s.', os.path.basename(outfilename), (time.time() - start_time))
 
     return None
-
-
-def production_line_manager(radar_file_name, outpath):
-    """
-    The production line manager calls the production line and manages it ;-).
-    Buffer function that is used to catch any problem with the processing line
-    without screwing the whole multiprocessing stuff.
-
-    Parameters:
-    ===========
-        radar_file_name: str
-            Name of the input radar file.
-        outpath: str
-            Path for saving output data.
-    """
-    shortname = os.path.basename(radar_file_name)
-    # If we are stuck in the loop for more than TIME_BEFORE_DEATH seconds,
-    # it will raise a TimeoutException that will kill the current process
-    # and go to the next iteration.
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(TIME_BEFORE_DEATH)
-    try:
-        production_line(radar_file_name, outpath)
-    except TimeoutException:
-        # Treatment time was too long.
-        logging.error("Too much time taken to treat %s, killing process.", shortname)
-        return None  # Go to next iteration.
-    except Exception:
-        print("Exception in production line code:")
-        print("-"*60)
-        traceback.print_exc(file=sys.stdout)
-        print("-"*60)
-        logging.error("An error occured during the processing of %s", shortname)
-        return None
-    else:
-        signal.alarm(0)
-
-    return None
-
-
-def production_line_multiproc(mydate):
-    """
-    It makes sure that input/output directories exist. This is where the
-    multiprocessing is taken care of.
-
-    INPATH and OUTPATH are global variables defined in __main__.
-
-    Parameter:
-    ==========
-        mydate: datetime.datetime
-            Radar data date for which we start the production.
-    """
-    year = str(mydate.year)
-    datestr = mydate.strftime("%Y%m%d")
-    indir = os.path.join(INPATH, year, datestr)
-    outdir = os.path.join(OUTPATH, year, datestr)
-
-    # Checking if input directory exists.
-    if not os.path.exists(indir):
-        logger.error("Input directory %s does not exist.", indir)
-        return None
-
-    # Checking if output directory exists. Creating them otherwise.
-    if not os.path.isdir(os.path.join(OUTPATH, year)):
-        os.mkdir(os.path.join(OUTPATH, year))
-    if not os.path.isdir(outdir):
-        os.mkdir(outdir)
-
-    # List netcdf files in directory.
-    flist = raijin_tools.get_files(indir)
-    if len(flist) == 0:
-        logger.error('%s empty.', indir)
-        return None
-    logger.info('%i files found for %s', len(flist), datestr)
-
-    # Cutting the file list into smaller chunks. (The multiprocessing.Pool instance
-    # is freed from memory, at each iteration of the main for loop).
-    for flist_slice in chunks(flist, NCPU):
-        # Because we use multiprocessing, we need to send a list of tuple as argument of Pool.starmap.
-        args_list = [None]*len(flist_slice)  # yes, I like declaring empty array.
-        for cnt, onefile in enumerate(flist_slice):
-            args_list[cnt] = (onefile, outdir)
-
-        # Start multiprocessing.
-        with Pool(NCPU) as pool:
-            pool.starmap(production_line_manager, args_list)
-
-    return None
-
-
-def main():
-    """
-    Just print a welcoming message and calls the production_line_multiproc.
-    """
-    # Start with a welcome message.
-    print("#"*79)
-    print("")
-    print(" "*25 + crayons.red("CPOL Level 1b production line.", bold=True))
-    print("")
-    print("- Input data directory path is: " + crayons.yellow(INPATH))
-    print("- Output data directory path is: " + crayons.yellow(OUTPATH))
-    print("- Radiosounding directory path is: " + crayons.yellow(SOUND_DIR))
-    print("- Figures will be saved in: " + crayons.yellow(FIGURE_CHECK_PATH))
-    print("- Start date is: " + crayons.yellow(START_DATE))
-    print("- End date is: " + crayons.yellow(END_DATE))
-    print("- Log files can be found in: " + crayons.yellow(LOG_FILE_PATH))
-    print("- Each subprocess has {}s of allowed time life before being killed.".format(TIME_BEFORE_DEATH))
-    print("#"*79)
-    print("")
-
-    # Serious stuffs begin here.
-    date_range = pd.date_range(START_DATE, END_DATE)
-    # One date at a time.
-    for thedate in date_range:
-        production_line_multiproc(thedate)
-
-    return None
-
-
-if __name__ == '__main__':
-    """
-    Global variables definition and logging file initialisation.
-    """
-    # Main global variables (Path directories).
-    # Input radar data directory
-    INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
-    # Output directory for CF/Radial PPIs
-    OUTPATH = "/g/data2/rr5/vhl548/v2CPOL_PROD_1b/"
-    # Output directory for GRIDDED netcdf data.
-    OUTPATH_GRID = os.path.join(OUTPATH, 'GRIDDED')
-    # Input directory for Radiosoundings (use my other script, named caprica to
-    # download and format these datas).
-    SOUND_DIR = "/g/data2/rr5/vhl548/soudings_netcdf/"
-    # Output directory for verification figures.
-    FIGURE_CHECK_PATH = os.path.join(OUTPATH, 'FIGURE_CHECK')
-    # Output directory for log files.
-    LOG_FILE_PATH = "/short/kl02/vhl548/logfiles/"
-    # Time in seconds for which each subprocess is allowed to live.
-    TIME_BEFORE_DEATH = 600  # seconds before killing process.
-
-    # Check if paths exist.
-    if not os.path.isdir(OUTPATH):
-        print("Output directory does not exist {}.".format(OUTPATH))
-        sys.exit()
-    if not os.path.isdir(LOG_FILE_PATH):
-        print("Creating log files directory: {}.".format(LOG_FILE_PATH))
-        os.mkdir(LOG_FILE_PATH)
-    if not os.path.isdir(OUTPATH_GRID):
-        print("Creating output figures directory: {}.".format(OUTPATH_GRID))
-        os.mkdir(OUTPATH_GRID)
-    if not os.path.isdir(FIGURE_CHECK_PATH):
-        print("Creating output figures directory: {}.".format(FIGURE_CHECK_PATH))
-        os.mkdir(FIGURE_CHECK_PATH)
-    if not os.path.isdir(SOUND_DIR):
-        print("Radiosoundings directory does not exist (or invalid): {}.".format(SOUND_DIR))
-        sys.exit()
-    if not os.path.isdir(INPATH):
-        print("Input data directory does not exist (or invalid): {}.".format(INPATH))
-        sys.exit()
-
-    # Parse arguments
-    parser_description = "Leveling treatment of CPOL data from level 1a to level 1b."
-    parser = argparse.ArgumentParser(description=parser_description)
-    parser.add_argument(
-        '-j',
-        '--cpu',
-        dest='ncpu',
-        default=16,
-        type=int,
-        help='Number of process')
-    parser.add_argument(
-        '-s',
-        '--start-date',
-        dest='start_date',
-        default=None,
-        type=str,
-        help='Starting date.')
-    parser.add_argument(
-        '-e',
-        '--end-date',
-        dest='end_date',
-        default=None,
-        type=str,
-        help='Ending date.')
-
-    args = parser.parse_args()
-    NCPU = args.ncpu
-    START_DATE = args.start_date
-    END_DATE = args.end_date
-
-    if not (START_DATE and END_DATE):
-        parser.error("Starting and ending date required.")
-
-    # Checking that dates are recognize.
-    try:
-        datetime.datetime.strptime(START_DATE, "%Y%m%d")
-        datetime.datetime.strptime(END_DATE, "%Y%m%d")
-    except Exception:
-        print("Did not understand the date format. Must be YYYYMMDD.")
-        sys.exit()
-
-    # Creating the general log file.
-    logname = "cpol_level1b_from_{}_to_{}.log".format(START_DATE, END_DATE)
-    log_file_name = os.path.join(LOG_FILE_PATH, logname)
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        filename=log_file_name,
-        filemode='a+')
-    logger = logging.getLogger(__name__)
-
-    with warnings.catch_warnings():
-        # Just ignoring warning messages.
-        warnings.simplefilter("ignore")
-        main()

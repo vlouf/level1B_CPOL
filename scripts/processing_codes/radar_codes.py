@@ -222,8 +222,7 @@ def correct_zdr(radar, zdr_name='ZDR', snr_name='SNR'):
     return corr_zdr
 
 
-def do_gatefilter(radar, noise_threshold=None, texture_name='TEXTURE',
-                  refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP'):
+def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP'):
     """
     Basic filtering
 
@@ -244,13 +243,6 @@ def do_gatefilter(radar, noise_threshold=None, texture_name='TEXTURE',
     gf = pyart.filters.GateFilter(radar)
     gf.exclude_outside(refl_name, -20, 90)
     gf.exclude_below(rhohv_name, 0.7)
-
-    # if noise_threshold is not None:
-    #     if not np.isnan(noise_threshold):
-    #         try:
-    #             gf.exclude_above(texture_name, noise_threshold)
-    #         except KeyError:
-    #             pass
 
     try:
         # NCP field is not present for older seasons.
@@ -664,6 +656,7 @@ def unfold_velocity_bis(radar, my_gatefilter, vel_name='VEL'):
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
     except (KeyError, IndexError):
+        vdop_art = radar.fields[vel_name]['data']
         v_nyq_vel = np.max(np.abs(vdop_art))
 
     vel_dealias = pyart.correct.dealias_unwrap_phase(radar,
