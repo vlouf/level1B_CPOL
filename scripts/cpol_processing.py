@@ -433,8 +433,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     goodkeys = ['corrected_differential_reflectivity', 'cross_correlation_ratio',
                 'temperature', 'giangrande_corrected_differential_phase',
                 'radar_echo_classification', 'radar_estimated_rain_rate', 'D0',
-                'NW', 'total_power', 'corrected_reflectivity', 'velocity',
-                'region_corrected_velocity']
+                'NW', 'corrected_reflectivity', 'velocity', 'region_corrected_velocity']
     for mykey in radar.fields.keys():
         if mykey not in goodkeys:
             unwanted_keys.append(mykey)
