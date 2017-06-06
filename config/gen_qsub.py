@@ -6,27 +6,24 @@ import calendar
 
 def configuration_file(ncpu=16, start_date='19990101', end_date='19990131'):
     conf_txt = """#!/bin/bash
-#PBS -P kl02
+#PBS -P en0
 #PBS -q normal
-#PBS -l walltime=8:00:00
+#PBS -l walltime=15:00:00
 #PBS -l mem={mem}GB
 #PBS -l wd
 #PBS -l ncpus={cpu}
 #PBS -lother=gdata2
 source activate radar
-python cpol_level1b.py -s {sdate} -e {edate} -j {cpu}
+python rajin_multiproc_processing.py -s {sdate} -e {edate} -j {cpu}
 """.format(cpu=ncpu, mem=int(ncpu*2), sdate=start_date, edate=end_date)
 
     return conf_txt
 
-
-
-
-for year in range(2010, 2017):
+for year in range(2014, 2017):
     for month in range(1, 13):
         if month > 7 and month < 10:
             continue
-            
+
         indir = "/g/data2/rr5/vhl548/CPOL_level_1"
         indir += "/%i/%i%02i" % (year, year, month)
         dirlist = glob.glob(indir + "*")
