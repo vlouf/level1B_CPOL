@@ -111,19 +111,14 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
     return None
 
 
-def rename_radar_fields(radar):
+def get_field_names():
     """
-    Rename radar fields from their old name to the Py-ART default name.
-
-    Parameter:
-    ==========
-        radar:
-            Py-ART radar structure.
+    Fields name definition.
 
     Returns:
     ========
-        radar:
-            Py-ART radar structure.
+        fields_names: array
+            Containing [(old key, new key), ...]
     """
     fields_names = [('VEL', 'velocity'),
                     ('VEL_UNFOLDED', 'region_corrected_velocity'),
@@ -145,6 +140,25 @@ def rename_radar_fields(radar):
                     ('WIDTH', 'spectrum_width'),
                     ('SNR', 'signal_to_noise_ratio'),
                     ('NCP', 'normalized_coherent_power')]
+
+    return fields_names
+
+
+def rename_radar_fields(radar):
+    """
+    Rename radar fields from their old name to the Py-ART default name.
+
+    Parameter:
+    ==========
+        radar:
+            Py-ART radar structure.
+
+    Returns:
+    ========
+        radar:
+            Py-ART radar structure.
+    """
+    fields_names = get_field_names()
 
     # Try to remove occasional fields.
     try:
