@@ -15,7 +15,7 @@ CPOL Level 1b main production line.
     production_line
 """
 # Python Standard Library
-# import gc
+import gc
 import os
 import time
 import logging
@@ -74,41 +74,44 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
     #     return None
 
     # Initializing figure.
-    gr = pyart.graph.RadarDisplay(radar)
-    fig, the_ax = pl.subplots(4, 3, figsize=(18, 20), sharex=True, sharey=True)
-    the_ax = the_ax.flatten()
-    # Plotting reflectivity
-    gr.plot_ppi('total_power', ax=the_ax[0])
-    gr.plot_ppi('corrected_reflectivity', ax=the_ax[1], gatefilter=gatefilter)
-    gr.plot_ppi('radar_echo_classification', ax=the_ax[2], gatefilter=gatefilter)
+    with pl.style.context('seaborn-paper'):
+        gr = pyart.graph.RadarDisplay(radar)
+        fig, the_ax = pl.subplots(4, 3, figsize=(12, 13.5), sharex=True, sharey=True)
+        the_ax = the_ax.flatten()
+        # Plotting reflectivity
+        gr.plot_ppi('total_power', ax=the_ax[0])
+        gr.plot_ppi('corrected_reflectivity', ax=the_ax[1], gatefilter=gatefilter)
+        gr.plot_ppi('radar_echo_classification', ax=the_ax[2], gatefilter=gatefilter)
 
-    gr.plot_ppi('differential_reflectivity', ax=the_ax[3])
-    gr.plot_ppi('corrected_differential_reflectivity', ax=the_ax[4], gatefilter=gatefilter)
-    gr.plot_ppi('cross_correlation_ratio', ax=the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
+        gr.plot_ppi('differential_reflectivity', ax=the_ax[3])
+        gr.plot_ppi('corrected_differential_reflectivity', ax=the_ax[4], gatefilter=gatefilter)
+        gr.plot_ppi('cross_correlation_ratio', ax=the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
 
-    gr.plot_ppi('giangrande_corrected_differential_phase', ax=the_ax[6],
-                gatefilter=gatefilter, vmin=-360, vmax=360,
-                cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
-    gr.plot_ppi('giangrande_specific_differential_phase', ax=the_ax[7],
-                gatefilter=gatefilter, vmin=-5, vmax=10,
-                cmap=pyart.config.get_field_colormap('specific_differential_phase'))
-    gr.plot_ppi('radar_estimated_rain_rate', ax=the_ax[8], gatefilter=gatefilter)
+        gr.plot_ppi('giangrande_corrected_differential_phase', ax=the_ax[6],
+                    gatefilter=gatefilter, vmin=-360, vmax=360,
+                    cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
+        gr.plot_ppi('giangrande_specific_differential_phase', ax=the_ax[7],
+                    gatefilter=gatefilter, vmin=-5, vmax=10,
+                    cmap=pyart.config.get_field_colormap('specific_differential_phase'))
+        gr.plot_ppi('radar_estimated_rain_rate', ax=the_ax[8], gatefilter=gatefilter)
 
-    gr.plot_ppi('velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-    gr.plot_ppi('region_corrected_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
-    gr.plot_ppi('D0', ax=the_ax[11], gatefilter=gatefilter, cmap='jet', vmin=0, vmax=20)
-    # gr.plot_ppi('region_corrected_velocity', ax=the_ax[11], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+        gr.plot_ppi('velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+        gr.plot_ppi('region_corrected_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+        gr.plot_ppi('D0', ax=the_ax[11], gatefilter=gatefilter, cmap='jet', vmin=0, vmax=20)
+        # gr.plot_ppi('region_corrected_velocity', ax=the_ax[11], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
 
-    for ax_sl in the_ax:
-        gr.plot_range_rings([50, 100, 150], ax=ax_sl)
-        ax_sl.set_aspect(1)
-        ax_sl.set_xlim(-150, 150)
-        ax_sl.set_ylim(-150, 150)
+        for ax_sl in the_ax:
+            gr.plot_range_rings([50, 100, 150], ax=ax_sl)
+            ax_sl.set_aspect(1)
+            ax_sl.set_xlim(-150, 150)
+            ax_sl.set_ylim(-150, 150)
 
-    pl.tight_layout()
-    pl.savefig(outfile)  # Saving figure.
-    fig.clf()  # Clear figure
-    pl.close()  # Release memory
+        pl.tight_layout()
+        pl.savefig(outfile)  # Saving figure.
+        fig.clf()  # Clear figure
+        pl.close()  # Release memory
+    del gr  # Releasing memory
+    gc.collect()  # Collecting memory garbage ;-)
 
     return None
 
@@ -242,6 +245,10 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
     datestr = radar_start_date.strftime("%Y%m%d_%H%M")
     logger.info("%s read.", radar_file_name)
+
+    # Correct Doppler velocity units.
+    radar.fields['VEL']['units'] = "m/s"
+    radar.fields['VEL']['standard_name'] = "radial_velocity"
 
     # Looking for NCP field
     try:

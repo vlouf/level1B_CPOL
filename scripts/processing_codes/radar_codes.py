@@ -628,6 +628,7 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL'):
                                                       nyquist_vel=v_nyq_vel)
 
     vdop_vel['units'] = "m/s"
+    vdop_vel['standard_name'] = "corrected_radial_velocity"
     vdop_vel['description'] = "Velocity unfolded using Py-ART region based dealiasing algorithm."
 
     return vdop_vel
