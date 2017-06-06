@@ -108,7 +108,7 @@ def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_GG'):
     ========
         atten_meta: dict
             Specific attenuation.
-        zh_corr: array
+        zh_meta: dict
             Attenuation corrected reflectivity.
     """
     r = radar.range['data']
@@ -118,12 +118,14 @@ def correct_attenuation_zh(radar, refl_name='DBZ', kdp_name='KDP_GG'):
     dr = (r[1] - r[0]) / 1000  # km
 
     atten_spec, atten = compute_attenuation(kdp, alpha=0.08, dr=dr)
-    zh_corr = refl + atten
+
+    zh_meta = pyart.config.get_metadata('corrected_reflectivity')
+    zh_meta['data'] = refl + atten
 
     atten_meta = {'data': atten_spec, 'units': 'dB/km', 'standard_name': 'specific_attenuation_zh',
                   'long_name': 'Reflectivity specific attenuation'}
 
-    return atten_meta, zh_corr
+    return atten_meta, zh_meta
 
 
 def correct_attenuation_zh_pyart(radar, refl_field='DBZ', ncp_field='NCP', rhv_field='RHOHV', phidp_field='PHIDP_GG'):

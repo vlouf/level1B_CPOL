@@ -232,7 +232,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         radar.fields['NCP']
         fake_ncp = False
     except KeyError:
-        tmp = np.zeros_like(radar.fields['DBZ']) + 1
+        tmp = np.zeros_like(radar.fields['DBZ']['data']) + 1
         radar.add_field_like('RHOHV', 'NCP', tmp)
         fake_ncp = True
 
@@ -331,8 +331,8 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
 
     # Correct Attenuation ZH
     logger.info("Starting computation of attenuation")
-    atten_spec, zh_corr = atten_codes.correct_attenuation_zh_pyart(radar)
-    radar.add_field_like('DBZ', 'DBZ_CORR', zh_corr, replace_existing=True)
+    atten_spec, zh_corr = atten_codes.correct_attenuation_zh(radar)
+    radar.add_field('DBZ_CORR', zh_corr, replace_existing=True)
     radar.add_field('specific_attenuation_reflectivity', atten_spec, replace_existing=True)
     logger.info('Attenuation on reflectivity corrected.')
 
