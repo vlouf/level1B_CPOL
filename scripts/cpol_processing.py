@@ -171,11 +171,6 @@ def rename_radar_fields(radar):
         radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
     except KeyError:
         pass
-    try:
-        vdop_art = radar.fields['VEL_CORR']
-        radar.fields.pop('VEL_CORR')
-    except KeyError:
-        pass
 
     # Parse array old_key, new_key
     for old_key, new_key in fields_names:
@@ -427,6 +422,9 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     pyart.io.write_cfradial(outfilename, radar, format='NETCDF4')
     save_time = time.time()
     logger.info('%s saved in %0.2f s.', os.path.basename(outfilename), (save_time - figure_time))
+
+    # Free memory from everything useless before gridding
+    gc.collect()
 
     # Deleting all unwanted keys for gridded product.
     logger.info("Gridding started.")
