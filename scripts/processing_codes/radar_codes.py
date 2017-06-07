@@ -545,6 +545,9 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         snr: dict
             Signal to noise ratio.
     """
+    # Altitude hack.
+    true_alt = deepcopy(radar.altitude['data'])
+    radar.altitude['data'] = np.array([0])
 
     if soundings_dir is None:
         soundings_dir = "/g/data2/rr5/vhl548/soudings_netcdf/"
@@ -579,7 +582,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     my_profile = pyart.retrieve.fetch_radar_time_profile(interp_sonde, radar)
 
     # CPOL altitude is 50 m.
-    good_altitude = my_profile['height'] > 50
+    good_altitude = my_profile['height'] >= 0
     # Getting the temperature
     z_dict, temp_dict = pyart.retrieve.map_profile_to_gates(temperatures[good_altitude],
                                                             my_profile['height'][good_altitude],
@@ -591,6 +594,9 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
                       'valid_min': -100, 'valid_max': 100,
                       'units': 'degrees Celsius',
                       'comment': 'Radiosounding date: %s' % (radar_start_date.strftime("%Y/%m/%d"))}
+
+    # Altitude hack
+    radar.altitude['data'] = true_alt
 
     # Calculate SNR
     snr = pyart.retrieve.calculate_snr_from_reflectivity(radar, refl_field=refl_field_name)
