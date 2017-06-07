@@ -209,6 +209,8 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # Correct an occasional mislabelling from RadX.
     if "SURV" in outfilename:
         outfilename = outfilename.replace("SURV", "PPI")
+    if "SUR" in outfilename:
+        outfilename = outfilename.replace("SUR", "PPI")
     outfilename = os.path.join(outpath, outfilename)
 
     # Check if output file already exists.
