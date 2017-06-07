@@ -575,9 +575,16 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     times = interp_sonde.variables['time'][:]
     heights = interp_sonde.variables['height'][:]
 
-    # Height and temperature profiles.
+    # Height profile corresponding to radar.
     my_profile = pyart.retrieve.fetch_radar_time_profile(interp_sonde, radar)
-    z_dict, temp_dict = pyart.retrieve.map_profile_to_gates(temperatures, my_profile['height'], radar)
+
+    # CPOL altitude is 50 m.
+    good_altitude = my_profile['height'] > 50
+    # Getting the temperature
+    z_dict, temp_dict = pyart.retrieve.map_profile_to_gates(temperatures[good_altitude],
+                                                            my_profile['height'][good_altitude],
+                                                            radar)
+
     temp_info_dict = {'data': temp_dict['data'],
                       'long_name': 'Sounding temperature at gate',
                       'standard_name': 'temperature',
