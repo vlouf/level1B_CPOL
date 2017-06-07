@@ -44,6 +44,9 @@ import numpy as np
 from scipy import ndimage, signal, integrate, interpolate
 from csu_radartools import csu_liquid_ice_mass, csu_fhc, csu_blended_rain, csu_dsd
 
+# Custom Library
+from clutter import filter_gabella
+
 
 def _my_snr_from_reflectivity(radar, refl_field='DBZ'):
     """
@@ -613,7 +616,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     return z_dict, temp_info_dict, snr
 
 
-def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL'):
+def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL', rhohv_name='RHOHV_CORR'):
     """
     Unfold Doppler velocity using Py-ART region based algorithm. Automatically
     searches for a folding-corrected velocity field.
@@ -635,6 +638,8 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL'):
         vdop_vel: dict
             Unfolded Doppler velocity.
     """
+    gf = deepcopy(my_gatefilter)
+    gf.exclude_below(rhohv_name, 0.8)
     # Trying to determine Nyquist velocity
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
@@ -646,13 +651,13 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL'):
     if bobby_params:
         vdop_vel = pyart.correct.dealias_region_based(radar,
                                                       vel_field=vel_name,
-                                                      gatefilter=my_gatefilter,
+                                                      gatefilter=gf,
                                                       nyquist_vel=v_nyq_vel,
                                                       skip_between_rays=2000)
     else:
         vdop_vel = pyart.correct.dealias_region_based(radar,
                                                       vel_field=vel_name,
-                                                      gatefilter=my_gatefilter,
+                                                      gatefilter=gf,
                                                       nyquist_vel=v_nyq_vel)
 
     vdop_vel['units'] = "m/s"
