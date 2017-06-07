@@ -44,9 +44,6 @@ import numpy as np
 from scipy import ndimage, signal, integrate, interpolate
 from csu_radartools import csu_liquid_ice_mass, csu_fhc, csu_blended_rain, csu_dsd
 
-# Custom Library
-from clutter import filter_gabella
-
 
 def _my_snr_from_reflectivity(radar, refl_field='DBZ'):
     """
