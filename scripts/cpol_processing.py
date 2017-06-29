@@ -251,9 +251,32 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         radar.fields['NCP']
         fake_ncp = False
     except KeyError:
+        # Creating a fake NCP field.
         tmp = np.zeros_like(radar.fields['DBZ']['data']) + 1
-        radar.add_field_like('RHOHV', 'NCP', tmp)
+        ncp_meta = pyart.config.get_metadata('normalized_coherent_power')
+        ncp_meta['data'] = tmp
+        ncp_meta['description'] = "THIS FIELD IS FAKE. DO NOT USE IT!"
+        radar.add_field('NCP', ncp_meta)
         fake_ncp = True
+
+    # Looking for RHOHV field
+    # For CPOL, season 09/10, there are no RHOHV fields before March!!!!
+    try:
+        radar.fields['RHOHV']
+        fake_rhohv = False
+    except KeyError:
+        # Creating a fake RHOHV field.
+        tmp = np.zeros_like(radar.fields['DBZ']['data']) + 1
+        rho_meta = pyart.config.get_metadata('cross_correlation_ratio')
+        rho_meta['data'] = tmp
+        rho_meta['description'] = "THIS FIELD IS FAKE. DO NOT USE IT!"
+        radar.add_field('NCP', rho_meta)
+        fake_rhohv = True
+
+    if fake_rhohv:
+        radar.metadata['debug_info'] = 'RHOHV field does not exist in RAW data. ' +\
+                                       'A fake RHOHV field has been used to process this file. Be careful.'
+        logger.critical("RHOHV field not found, creating a fake RHOHV")
 
     # Compute SNR
     try:
