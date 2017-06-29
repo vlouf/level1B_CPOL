@@ -575,6 +575,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     print("Reading radiosounding %s" % (sonde_name))
     interp_sonde = netCDF4.Dataset(os.path.join(soundings_dir, sonde_name))
     temperatures = interp_sonde.variables['temp'][:]
+    temperatures[(temperatures < -100) | (temperatures > 100)] = np.NaN
     times = interp_sonde.variables['time'][:]
     heights = interp_sonde.variables['height'][:]
 
