@@ -270,7 +270,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         rho_meta = pyart.config.get_metadata('cross_correlation_ratio')
         rho_meta['data'] = tmp
         rho_meta['description'] = "THIS FIELD IS FAKE. DO NOT USE IT!"
-        radar.add_field('NCP', rho_meta)
+        radar.add_field('RHOHV', rho_meta)
         fake_rhohv = True
 
     if fake_rhohv:
