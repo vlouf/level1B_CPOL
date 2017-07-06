@@ -86,7 +86,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
         gr.plot_ppi('corrected_differential_reflectivity', ax=the_ax[4], gatefilter=gatefilter)
         gr.plot_ppi('cross_correlation_ratio', ax=the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
 
-        gr.plot_ppi('giangrande_corrected_differential_phase', ax=the_ax[6],
+        gr.plot_ppi('giangrande_differential_phase', ax=the_ax[6],
                     gatefilter=gatefilter, vmin=-360, vmax=360,
                     cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
         gr.plot_ppi('giangrande_specific_differential_phase', ax=the_ax[7],
@@ -133,9 +133,9 @@ def get_field_names():
                     ('RHOHV', 'cross_correlation_ratio'),
                     ('ZDR', 'differential_reflectivity'),
                     ('ZDR_CORR', 'corrected_differential_reflectivity'),
-                    ('PHIDP', 'corrected_differential_phase'),
-                    ('PHIDP_BRINGI', 'bringi_corrected_differential_phase'),
-                    ('PHIDP_GG', 'giangrande_corrected_differential_phase'),
+                    ('PHIDP', 'differential_phase'),
+                    ('PHIDP_BRINGI', 'bringi_differential_phase'),
+                    ('PHIDP_GG', 'giangrande_differential_phase'),
                     ('PHIDP_SIM', 'simulated_differential_phase'),
                     ('KDP', 'specific_differential_phase'),
                     ('KDP_BRINGI', 'bringi_specific_differential_phase'),
@@ -331,12 +331,12 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         logger.info('KDP estimated.')
 
     # Bringi PHIDP/KDP
-    phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter)
-    radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
-    radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
-    radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_" + radar.fields['PHIDP_BRINGI']['long_name']
-    radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
-    logger.info('KDP/PHIDP Bringi estimated.')
+    # phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter)
+    # radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
+    # radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
+    # radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_" + radar.fields['PHIDP_BRINGI']['long_name']
+    # radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
+    # logger.info('KDP/PHIDP Bringi estimated.')
 
     # Giangrande PHIDP/KDP
     phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP_SIM')
@@ -415,6 +415,13 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     if fake_ncp:
         radar.fields.pop('NCP')
 
+    # Remove useless fields:
+    for mykey in ["KDP_SIM", "PHIDP_SIM", "KDP_BRINGI", "PHIDP_BRINGI"]:
+        try:
+            radar.fields.pop(mykey)
+        except KeyError:
+            continue
+
     # Rename fields to pyart defaults.
     radar = rename_radar_fields(radar)
 
@@ -435,7 +442,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     for mykey in radar.fields:
         if mykey in ['temperature', 'height', 'signal_to_noise_ratio',
                      'normalized_coherent_power', 'spectrum_width', 'total_power',
-                     'giangrande_corrected_differential_phase', 'giangrande_specific_differential_phase']:
+                     'giangrande_differential_phase', 'giangrande_specific_differential_phase']:
             # Virgin fields that are left untouch.
             continue
         else:
@@ -454,7 +461,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     logger.info("Gridding started.")
     unwanted_keys = []
     goodkeys = ['corrected_differential_reflectivity', 'cross_correlation_ratio',
-                'temperature', 'giangrande_corrected_differential_phase',
+                'temperature', 'giangrande_differential_phase',
                 'radar_echo_classification', 'radar_estimated_rain_rate', 'D0',
                 'NW', 'corrected_reflectivity', 'corrected_velocity', 'region_dealias_velocity']
     for mykey in radar.fields.keys():
