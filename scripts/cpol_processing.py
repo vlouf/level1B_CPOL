@@ -4,13 +4,15 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 6/06/2017
+@date: 1/08/2017
 @version: 0.99
 
 .. autosummary::
     :toctree: generated/
 
     plot_figure_check
+    get_field_names
+    read_radar
     rename_radar_fields
     production_line
 """
@@ -148,6 +150,48 @@ def get_field_names():
     return fields_names
 
 
+def read_radar(radar_file_name):
+    """
+    Read the input radar file.
+
+    Parameter:
+    ==========
+        radar_file_name: str
+            Radar file name.
+
+    Return:
+    =======
+        radar: struct
+            Py-ART radar structure.
+    """
+    # Read the input radar file.
+    try:
+        if ".h5" in radar_file_name:
+            radar = pyart.aux_io.read_odim_h5(radar_file_name)
+        else:
+            radar = pyart.io.read(radar_file_name)
+    except Exception:
+        logger.error("MAJOR ERROR: unable to read input file {}".format(radar_file_name))
+        return None
+
+    # SEAPOL hack change fields key.
+    try:
+        radar.fields['DBZ']
+    except KeyError:
+        myfields = [('NCPH', "NCP"),
+                    ('DBZH', "DBZ"),
+                    ('WIDTHH', "WIDTH"),
+                    ('UH', "DBZ"),
+                    ('VELH', "VEL")]
+        for mykey, newkey in myfields:
+            try:
+                radar.add_field(newkey, radar.fields.pop(mykey))
+            except Exception:
+                continue
+
+    return radar
+
+
 def rename_radar_fields(radar):
     """
     Rename radar fields from their old name to the Py-ART default name.
@@ -221,30 +265,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # Start chronometer.
     start_time = time.time()
 
-    # Read the input radar file.
-    try:
-        if ".h5" in radar_file_name:
-            radar = pyart.aux_io.read_odim_h5(radar_file_name)
-        else:
-            radar = pyart.io.read(radar_file_name)
-    except Exception:
-        logger.error("MAJOR ERROR: unable to read input file {}".format(radar_file_name))
-        return None
-
-    # SEAPOL
-    try:
-        radar.fields['DBZ']
-    except KeyError:
-        myfields = [('NCPH', "NCP"),
-                    ('DBZH', "DBZ"),
-                    ('WIDTHH', "WIDTH"),
-                    ('UH', "DBZ"),
-                    ('VELH', "VEL")]
-        for mykey, newkey in myfields:
-            try:
-                radar.add_field(newkey, radar.fields.pop(mykey))
-            except Exception:
-                continue
+    radar = read_radar(radar_file_name)
 
     # Check if radar scan is complete.
     if not radar_codes.check_azimuth(radar):
