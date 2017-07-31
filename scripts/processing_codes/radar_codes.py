@@ -279,7 +279,7 @@ def dsd_retrieval(radar, refl_name='DBZ', zdr_name='ZDR', kdp_name='KDP_GG'):
             Median Volume Diameter.
     """
     dbz = radar.fields[refl_name]['data'].filled(np.NaN)
-    zdr = radar.fields[zdr_name]['data'].filled(np.NaN)
+    zdr = radar.fields[zdr_name]['data']
     try:
         kdp = radar.fields[kdp_name]['data'].filled(np.NaN)
     except AttributeError:
@@ -553,7 +553,7 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         soundings_dir = "/g/data2/rr5/vhl548/soudings_netcdf/"
 
     # Getting radar date.
-    radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'])
+    radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'].replace("since", "since "))
 
     # Listing radiosounding files.
     sonde_pattern = datetime.datetime.strftime(radar_start_date, 'YPDN_%Y%m%d*')
@@ -565,12 +565,12 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
     except IndexError:
         # The radiosoundings for the exact date does not exist, looking for the
         # closest date.
-        print("Sounding file not found, looking for the nearest date.")
-        dtime = [datetime.datetime.strptime(dt, 'YPDN_%Y%m%d_%H.nc') for dt in all_sonde_files]
-        closest_date = _nearest(dtime, radar_start_date)
-        sonde_pattern = datetime.datetime.strftime(closest_date, 'YPDN_%Y%m%d*')
-        radar_start_date = closest_date
-        sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
+        # print("Sounding file not found, looking for the nearest date.")
+        # dtime = [datetime.datetime.strptime(dt, 'YPDN_%Y%m%d_%H.nc') for dt in all_sonde_files]
+        # closest_date = _nearest(dtime, radar_start_date)
+        # sonde_pattern = datetime.datetime.strftime(closest_date, 'YPDN_%Y%m%d*')
+        # radar_start_date = closest_date
+        sonde_name = "/g/data2/rr5/vhl548/soudings_netcdf/YPDN_20160212_12.nc" # sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
 
     print("Reading radiosounding %s" % (sonde_name))
     interp_sonde = netCDF4.Dataset(os.path.join(soundings_dir, sonde_name))
