@@ -23,15 +23,15 @@ import time
 import logging
 import datetime
 import traceback
+
 # Other Libraries -- Matplotlib must be imported first
+import netCDF4
+import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
 import matplotlib.colors as colors
 import matplotlib.pyplot as pl
-
 import pyart
-import netCDF4
-import numpy as np
 
 # Custom modules.
 from processing_codes import radar_codes
@@ -403,17 +403,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.add_field('VEL_UNFOLDED', vdop_unfold, replace_existing=True)
     logger.info('Doppler velocity unfolded.')
 
-    # This function will use the unwrap phase algorithm.
-    # vdop_unfold = radar_codes.unfold_velocity_bis(radar, gatefilter)
-    # radar.add_field('VEL_UNWRAP', vdop_unfold, replace_existing=True)
-    # logger.info('Doppler velocity unwrapped.')
-
     # Correct Attenuation ZH
-    # logger.info("Starting computation of attenuation")
-    # atten_spec, zh_corr = atten_codes.correct_attenuation_zh(radar)
-    # radar.add_field('DBZ_CORR', zh_corr, replace_existing=True)
-    # radar.add_field('specific_attenuation_reflectivity', atten_spec, replace_existing=True)
-    # logger.info('Attenuation on reflectivity corrected.')
     atten_spec, zh_corr = atten_codes.correct_attenuation_zh_pyart(radar)
     radar.add_field('DBZ_CORR', zh_corr, replace_existing=True)
     radar.add_field('specific_attenuation_reflectivity', atten_spec, replace_existing=True)
