@@ -66,7 +66,7 @@ def _my_snr_from_reflectivity(radar, refl_field='DBZ'):
     range_grid += 1  # Cause of 0
 
     # remove range scale.. This is basically the radar constant scaled dBm
-    pseudo_power = (radar.fields[refl_field]['data'] - 20.0*np.log10(range_grid / 1000.0))
+    pseudo_power = (radar.fields[refl_field]['data'] - 20.0 * np.log10(range_grid / 1000.0))
     # The noise_floor_estimate can fail sometimes in pyart, that's the reason
     # why this whole function exists.
     noise_floor_estimate = -40
@@ -187,8 +187,8 @@ def correct_rhohv(radar, rhohv_name='RHOHV', snr_name='SNR'):
     """
     rhohv = radar.fields[rhohv_name]['data']
     snr = radar.fields[snr_name]['data']
-    natural_snr = 10**(0.1*snr)
-    rho_corr = rhohv / (1 + 1/natural_snr)
+    natural_snr = 10**(0.1 * snr)
+    rho_corr = rhohv / (1 + 1 / natural_snr)
 
     return rho_corr
 
@@ -215,9 +215,9 @@ def correct_zdr(radar, zdr_name='ZDR', snr_name='SNR'):
     zdr = radar.fields[zdr_name]['data']
     snr = radar.fields[snr_name]['data']
     alpha = 1.48
-    natural_zdr = 10**(0.1*zdr)
-    natural_snr = 10**(0.1*snr)
-    corr_zdr = 10*np.log10((alpha*natural_snr*natural_zdr) / (alpha*natural_snr + alpha - natural_zdr))
+    natural_zdr = 10**(0.1 * zdr)
+    natural_snr = 10**(0.1 * snr)
+    corr_zdr = 10 * np.log10((alpha * natural_snr * natural_zdr) / (alpha * natural_snr + alpha - natural_zdr))
 
     return corr_zdr
 
@@ -394,7 +394,7 @@ def get_field_names():
 
     return fields_names
 
-    
+
 def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                                kdp_name='KDP_GG', rhohv_name='RHOHV_CORR',
                                temperature_name='temperature',
@@ -476,7 +476,7 @@ def liquid_ice_mass(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
     radar_T = radar.fields[temperature_name]['data']
     radar_z = radar.fields[height_name]['data']
 
-    liquid_water_mass, ice_mass = csu_liquid_ice_mass.calc_liquid_ice_mass(refl, zdr, radar_z/1000, T=radar_T)
+    liquid_water_mass, ice_mass = csu_liquid_ice_mass.calc_liquid_ice_mass(refl, zdr, radar_z / 1000.0, T=radar_T)
 
     liquid_water_mass = {'data': liquid_water_mass, 'units': 'g m-3',
                          'long_name': 'Liquid Water Content',
@@ -671,14 +671,11 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         # The radiosoundings for the exact date exists.
         sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
     except IndexError:
-        # The radiosoundings for the exact date does not exist, looking for the
-        # closest date.
-        # print("Sounding file not found, looking for the nearest date.")
-        # dtime = [datetime.datetime.strptime(dt, 'YPDN_%Y%m%d_%H.nc') for dt in all_sonde_files]
-        # closest_date = _nearest(dtime, radar_start_date)
-        # sonde_pattern = datetime.datetime.strftime(closest_date, 'YPDN_%Y%m%d*')
-        # radar_start_date = closest_date
-        sonde_name = "/g/data2/rr5/vhl548/soudings_netcdf/YPDN_20160212_12.nc" # sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
+        # The radiosoundings for the exact date does not exist, looking for the closest date.
+        print("Sounding file not found, looking for the nearest date.")
+        dtime = [datetime.datetime.strptime(dt, 'YPDN_%Y%m%d_%H.nc') for dt in all_sonde_files]
+        closest_date = _nearest(dtime, radar_start_date)
+        sonde_name = os.path.join(soundings_dir, "YPDN_{}.nc".format(closest_date.strftime("%Y%m%d_%H")))
 
     print("Reading radiosounding %s" % (sonde_name))
     interp_sonde = netCDF4.Dataset(os.path.join(soundings_dir, sonde_name))

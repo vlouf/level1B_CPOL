@@ -4,7 +4,7 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 1/08/2017
+@date: 11/08/2017
 @version: 0.99
 
 .. autosummary::
@@ -108,8 +108,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
         pl.savefig(outfile)  # Saving figure.
         fig.clf()  # Clear figure
         pl.close()  # Release memory
-    del gr  # Releasing memory
-    gc.collect()  # Collecting memory garbage ;-)
+    del gr  # Releasing memory    
 
     return None
 
