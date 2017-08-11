@@ -241,8 +241,8 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP
             Gate filter (excluding all bad data).
     """
     gf = pyart.filters.GateFilter(radar)
-    gf.exclude_outside(refl_name, -20, 90)
-    gf.exclude_below(rhohv_name, 0.7)
+    gf.exclude_outside(refl_name, -30, 90)
+    gf.exclude_below(rhohv_name, 0.5)
 
     try:
         # NCP field is not present for older seasons.
