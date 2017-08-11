@@ -179,10 +179,9 @@ if __name__ == '__main__':
     """
     # Main global variables (Path directories).
     # Input radar data directory
-    # INPATH = "/g/data2/rr5/vhl548/CPOL_level_1/"
-    INPATH = "/g/data2/rr5/satellite/experiments/protat/SEAPOL/"
+    INPATH = "/g/data2/rr5/vhl548/NEW_CPOL_level_1a"
     # Output directory for CF/Radial PPIs
-    OUTPATH = "/g/data2/rr5/vhl548/SEAPOL_1B/"
+    OUTPATH = "/g/data2/rr5/vhl548/NEW_CPOL_1B"
     # Output directory for GRIDDED netcdf data.
     OUTPATH_GRID = os.path.join(OUTPATH, 'GRIDDED')
     # Input directory for Radiosoundings (use my other script, named caprica to
