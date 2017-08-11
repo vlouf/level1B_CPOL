@@ -94,7 +94,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
                     cmap=pyart.config.get_field_colormap('specific_differential_phase'))
         gr.plot_ppi('radar_estimated_rain_rate', ax=the_ax[8], gatefilter=gatefilter)
 
-        gr.plot_ppi('corrected_velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
+        gr.plot_ppi('velocity', ax=the_ax[9], cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
         gr.plot_ppi('region_dealias_velocity', ax=the_ax[10], gatefilter=gatefilter, cmap=pyart.graph.cm.NWSVel, vmin=-30, vmax=30)
         gr.plot_ppi('D0', ax=the_ax[11], gatefilter=gatefilter, cmap='pyart_Wild25', vmin=0, vmax=20)
 
@@ -364,7 +364,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     goodkeys = ['corrected_differential_reflectivity', 'cross_correlation_ratio',
                 'temperature', 'giangrande_corrected_differential_phase',
                 'radar_echo_classification', 'radar_estimated_rain_rate', 'D0',
-                'NW', 'corrected_reflectivity', 'corrected_velocity', 'region_dealias_velocity']
+                'NW', 'corrected_reflectivity', 'velocity', 'region_dealias_velocity']
     for mykey in radar.fields.keys():
         if mykey not in goodkeys:
             unwanted_keys.append(mykey)
