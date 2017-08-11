@@ -86,9 +86,9 @@ def production_line_manager(radar_file_name, outpath, outpath_grid, figure_path,
         return None  # Go to next iteration.
     except Exception:
         print("Exception in production line code:")
-        print("-"*60)
+        print("-" * 60)
         traceback.print_exc(file=sys.stdout)
-        print("-"*60)
+        print("-" * 60)
         logging.error("Failed to process file", exc_info=True)
         return None
     else:
@@ -118,7 +118,7 @@ def production_line_multiproc(mydate):
     if not os.path.exists(indir):
         logger.error("Input directory %s does not exist.", indir)
         indir = INPATH
-        #return None
+        # return None
 
     # Checking if output directory exists. Creating them otherwise.
     if not os.path.isdir(os.path.join(OUTPATH, year)):
@@ -137,9 +137,7 @@ def production_line_multiproc(mydate):
     # is freed from memory, at each iteration of the main for loop).
     for flist_slice in chunks(flist, NCPU):
         # Because we use multiprocessing, we need to send a list of tuple as argument of Pool.starmap.
-        args_list = [None]*len(flist_slice)  # yes, I like declaring empty array.
-        for cnt, onefile in enumerate(flist_slice):
-            args_list[cnt] = (onefile, outdir, OUTPATH_GRID, FIGURE_CHECK_PATH, SOUND_DIR)
+        args_list = [(onefile, outdir, OUTPATH_GRID, FIGURE_CHECK_PATH, SOUND_DIR) for onefile in flist_slice]
         # Start multiprocessing.
         with Pool(NCPU) as pool:
             pool.starmap(production_line_manager, args_list)
@@ -152,9 +150,9 @@ def main():
     Just print a welcoming message and calls the production_line_multiproc.
     """
     # Start with a welcome message.
-    print("#"*79)
+    print("#" * 79)
     print("")
-    print(" "*25 + crayons.red("CPOL Level 1b production line.", bold=True))
+    print(" " * 25 + crayons.red("CPOL Level 1b production line.", bold=True))
     print("")
     print("- Input data directory path is: " + crayons.yellow(INPATH))
     print("- Output data directory path is: " + crayons.yellow(OUTPATH))
@@ -164,7 +162,7 @@ def main():
     print("- End date is: " + crayons.yellow(END_DATE))
     print("- Log files can be found in: " + crayons.yellow(LOG_FILE_PATH))
     print("- Each subprocess has {}s of allowed time life before being killed.".format(TIME_BEFORE_DEATH))
-    print("#"*79)
+    print("#" * 79)
     print("")
 
     # Serious stuffs begin here.
