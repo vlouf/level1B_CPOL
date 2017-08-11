@@ -75,23 +75,20 @@ if __name__ == '__main__':
         '-i',
         '--input',
         dest='infile',
-        default=None,
         type=str,
-        help='Input file')
+        help='Input file',
+        required=True)
     parser.add_argument(
         '-o',
         '--output',
         dest='outdir',
-        default=None,
         type=str,
-        help='Output directory.')
+        help='Output directory.',
+        required=True)
 
     args = parser.parse_args()
     INFILE = args.infile
     OUTPATH = args.outdir
-
-    if not (INFILE and OUTPATH):
-        parser.error("Input file and output directory required.")
 
     if not os.path.isfile(INFILE):
         parser.error("Invalid input file.")

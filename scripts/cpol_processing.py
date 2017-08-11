@@ -108,7 +108,7 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
         pl.savefig(outfile)  # Saving figure.
         fig.clf()  # Clear figure
         pl.close()  # Release memory
-    del gr  # Releasing memory    
+    del gr  # Releasing memory
 
     return None
 
@@ -258,25 +258,25 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter)
     radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
     radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
-    radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_" + radar.fields['PHIDP_BRINGI']['long_name']
-    radar.fields['KDP_BRINGI']['long_name'] = "bringi_" + radar.fields['KDP_BRINGI']['long_name']
+    radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_differential_phase"
+    radar.fields['KDP_BRINGI']['long_name'] = "bringi_specific_differential_phase"
     logger.info('KDP/PHIDP Bringi estimated.')
 
     # Giangrande PHIDP/KDP
     phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP_BRINGI')
     radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
     radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
-    radar.fields['PHIDP_GG']['long_name'] = "giangrande_" + radar.fields['PHIDP_GG']['long_name']
-    radar.fields['KDP_GG']['long_name'] = "giangrande_" + radar.fields['KDP_GG']['long_name']
+    radar.fields['PHIDP_GG']['long_name'] = "giangrande_differential_phase"
+    radar.fields['KDP_GG']['long_name'] = "giangrande_specific_differential_phase"
     logger.info('KDP/PHIDP Giangrande estimated.')
 
-    # Refold VELOCITY using unfolded PHIDP
-    vel_refolded, is_refolded = radar_codes.refold_velocity(radar)
-    # Check if velocity was refolded.
-    if is_refolded:
-        logger.info('Doppler velocity has been refolded.')
-        radar.add_field_like('VEL', 'VEL_CORR', vel_refolded, replace_existing=True)
-        radar.fields['VEL_CORR']['long_name'] = radar.fields['VEL_CORR']['long_name'] + "_refolded"
+    # # Refold VELOCITY using unfolded PHIDP
+    # vel_refolded, is_refolded = radar_codes.refold_velocity(radar)
+    # # Check if velocity was refolded.
+    # if is_refolded:
+    #     logger.info('Doppler velocity has been refolded.')
+    #     radar.add_field_like('VEL', 'VEL_CORR', vel_refolded, replace_existing=True)
+    #     radar.fields['VEL_CORR']['long_name'] = "corrected_velocity_refolded"
 
     # Unfold VELOCITY
     # This function will check if a 'VEL_CORR' field exists anyway.
@@ -315,7 +315,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.add_field("NW", nw_dict)
     logger.info('DSD estimated.')
 
-    # Removing fake fields.
+    # Removing fake and useless fields.
     if fake_ncp:
         radar.fields.pop('NCP')
 
@@ -323,7 +323,6 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         radar.fields.pop("RHOHV")
         radar.fields.pop("RHOHV_CORR")
 
-    # Removing useless fields:
     radar.fields.pop("PHIDP_BRINGI")
     radar.fields.pop("KDP_BRINGI")
 
