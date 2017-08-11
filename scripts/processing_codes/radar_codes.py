@@ -362,6 +362,39 @@ def filter_hardcoding(my_array, nuke_filter, bad=-9999):
     return to_return
 
 
+def get_field_names():
+    """
+    Fields name definition.
+
+    Returns:
+    ========
+        fields_names: array
+            Containing [(old key, new key), ...]
+    """
+    fields_names = [('VEL', 'velocity'),
+                    ('VEL_CORR', 'corrected_velocity'),
+                    ('VEL_UNFOLDED', 'region_dealias_velocity'),
+                    ('DBZ', 'total_power'),
+                    ('DBZ_CORR', 'corrected_reflectivity'),
+                    ('RHOHV_CORR', 'RHOHV'),
+                    ('RHOHV', 'cross_correlation_ratio'),
+                    ('ZDR', 'differential_reflectivity'),
+                    ('ZDR_CORR', 'corrected_differential_reflectivity'),
+                    ('PHIDP', 'corrected_differential_phase'),
+                    ('PHIDP_BRINGI', 'bringi_corrected_differential_phase'),
+                    ('PHIDP_GG', 'giangrande_corrected_differential_phase'),
+                    ('PHIDP_SIM', 'simulated_differential_phase'),
+                    ('KDP', 'specific_differential_phase'),
+                    ('KDP_BRINGI', 'bringi_specific_differential_phase'),
+                    ('KDP_GG', 'giangrande_specific_differential_phase'),
+                    ('KDP_SIM', 'simulated_specific_differential_phase'),
+                    ('WIDTH', 'spectrum_width'),
+                    ('SNR', 'signal_to_noise_ratio'),
+                    ('NCP', 'normalized_coherent_power')]
+
+    return fields_names
+
+    
 def hydrometeor_classification(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR',
                                kdp_name='KDP_GG', rhohv_name='RHOHV_CORR',
                                temperature_name='temperature',
@@ -499,6 +532,48 @@ def rainfall_rate(radar, refl_name='DBZ_CORR', zdr_name='ZDR_CORR', kdp_name='KD
     return rainrate
 
 
+def read_radar(radar_file_name):
+    """
+    Read the input radar file.
+
+    Parameter:
+    ==========
+        radar_file_name: str
+            Radar file name.
+
+    Return:
+    =======
+        radar: struct
+            Py-ART radar structure.
+    """
+    # Read the input radar file.
+    try:
+        if ".h5" in radar_file_name:
+            radar = pyart.aux_io.read_odim_h5(radar_file_name)
+        else:
+            radar = pyart.io.read(radar_file_name)
+    except Exception:
+        logger.error("MAJOR ERROR: unable to read input file {}".format(radar_file_name))
+        return None
+
+    # SEAPOL hack change fields key.
+    try:
+        radar.fields['DBZ']
+    except KeyError:
+        myfields = [('NCPH', "NCP"),
+                    ('DBZH', "DBZ"),
+                    ('WIDTHH', "WIDTH"),
+                    ('UH', "DBZ"),
+                    ('VELH', "VEL")]
+        for mykey, newkey in myfields:
+            try:
+                radar.add_field(newkey, radar.fields.pop(mykey))
+            except Exception:
+                continue
+
+    return radar
+
+
 def refold_velocity(radar, vel_name='VEL', phidp_name="PHIDP"):
     phi = radar.fields[phidp_name]['data']
     vel = deepcopy(radar.fields[vel_name]['data'])
@@ -519,6 +594,39 @@ def refold_velocity(radar, vel_name='VEL', phidp_name="PHIDP"):
         is_refolded = True
 
     return vel, is_refolded
+
+
+def rename_radar_fields(radar):
+    """
+    Rename radar fields from their old name to the Py-ART default name.
+
+    Parameter:
+    ==========
+        radar:
+            Py-ART radar structure.
+
+    Returns:
+    ========
+        radar:
+            Py-ART radar structure.
+    """
+    fields_names = get_field_names()
+
+    # Try to remove occasional fields.
+    try:
+        vdop_art = radar.fields['PHIDP_CORR']
+        radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
+    except KeyError:
+        pass
+
+    # Parse array old_key, new_key
+    for old_key, new_key in fields_names:
+        try:
+            radar.add_field(new_key, radar.fields.pop(old_key), replace_existing=True)
+        except KeyError:
+            continue
+
+    return radar
 
 
 def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):

@@ -11,8 +11,6 @@ CPOL Level 1b main production line.
     :toctree: generated/
 
     plot_figure_check
-    get_field_names
-    read_radar
     rename_radar_fields
     production_line
 """
@@ -116,115 +114,6 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
     return None
 
 
-def get_field_names():
-    """
-    Fields name definition.
-
-    Returns:
-    ========
-        fields_names: array
-            Containing [(old key, new key), ...]
-    """
-    fields_names = [('VEL', 'velocity'),
-                    ('VEL_CORR', 'corrected_velocity'),
-                    ('VEL_UNFOLDED', 'region_dealias_velocity'),
-                    ('VEL_UNWRAP', 'dealias_velocity'),
-                    ('DBZ', 'total_power'),
-                    ('DBZ_CORR', 'corrected_reflectivity'),
-                    ('RHOHV_CORR', 'RHOHV'),
-                    ('RHOHV', 'cross_correlation_ratio'),
-                    ('ZDR', 'differential_reflectivity'),
-                    ('ZDR_CORR', 'corrected_differential_reflectivity'),
-                    ('PHIDP', 'corrected_differential_phase'),
-                    ('PHIDP_BRINGI', 'bringi_corrected_differential_phase'),
-                    ('PHIDP_GG', 'giangrande_corrected_differential_phase'),
-                    ('PHIDP_SIM', 'simulated_differential_phase'),
-                    ('KDP', 'specific_differential_phase'),
-                    ('KDP_BRINGI', 'bringi_specific_differential_phase'),
-                    ('KDP_GG', 'giangrande_specific_differential_phase'),
-                    ('KDP_SIM', 'simulated_specific_differential_phase'),
-                    ('WIDTH', 'spectrum_width'),
-                    ('SNR', 'signal_to_noise_ratio'),
-                    ('NCP', 'normalized_coherent_power')]
-
-    return fields_names
-
-
-def read_radar(radar_file_name):
-    """
-    Read the input radar file.
-
-    Parameter:
-    ==========
-        radar_file_name: str
-            Radar file name.
-
-    Return:
-    =======
-        radar: struct
-            Py-ART radar structure.
-    """
-    # Read the input radar file.
-    try:
-        if ".h5" in radar_file_name:
-            radar = pyart.aux_io.read_odim_h5(radar_file_name)
-        else:
-            radar = pyart.io.read(radar_file_name)
-    except Exception:
-        logger.error("MAJOR ERROR: unable to read input file {}".format(radar_file_name))
-        return None
-
-    # SEAPOL hack change fields key.
-    try:
-        radar.fields['DBZ']
-    except KeyError:
-        myfields = [('NCPH', "NCP"),
-                    ('DBZH', "DBZ"),
-                    ('WIDTHH', "WIDTH"),
-                    ('UH', "DBZ"),
-                    ('VELH', "VEL")]
-        for mykey, newkey in myfields:
-            try:
-                radar.add_field(newkey, radar.fields.pop(mykey))
-            except Exception:
-                continue
-
-    return radar
-
-
-def rename_radar_fields(radar):
-    """
-    Rename radar fields from their old name to the Py-ART default name.
-
-    Parameter:
-    ==========
-        radar:
-            Py-ART radar structure.
-
-    Returns:
-    ========
-        radar:
-            Py-ART radar structure.
-    """
-    fields_names = get_field_names()
-
-    # Try to remove occasional fields.
-    try:
-        vdop_art = radar.fields['PHIDP_CORR']
-        radar.add_field('PHIDP', radar.fields.pop('PHIDP_CORR'), replace_existing=True)
-    except KeyError:
-        pass
-
-    # Parse array old_key, new_key
-    for old_key, new_key in fields_names:
-        try:
-            radar.add_field(new_key, radar.fields.pop(old_key), replace_existing=True)
-        except KeyError:
-            continue
-
-    return radar
-
-
 def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_dir):
     """
     Production line for correcting and estimating CPOL data radar parameters.
@@ -250,6 +139,10 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # Generate output file name.
     outfilename = os.path.basename(radar_file_name)
     outfilename = outfilename.replace("level1a", "level1b")
+
+    # Correct occasional missing suffix.
+    if "level1b" not in outfilename:
+        outfilename = outfilename.replace(".nc", "_level1b.nc")
     # Correct an occasional mislabelling from RadX.
     if "SURV" in outfilename:
         outfilename = outfilename.replace("SURV", "PPI")
@@ -265,7 +158,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # Start chronometer.
     start_time = time.time()
 
-    radar = read_radar(radar_file_name)
+    radar = radar_codes.read_radar(radar_file_name)
 
     # Check if radar scan is complete.
     if not radar_codes.check_azimuth(radar):
@@ -324,8 +217,10 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         traceback.print_exc()
         logger.error("Impossible to compute SNR")
         return None
+
     radar.add_field('temperature', temperature, replace_existing=True)
     radar.add_field('height', height, replace_existing=True)
+
     try:
         radar.fields['SNR']
         logger.info('SNR already exists.')
@@ -338,11 +233,6 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.add_field_like('RHOHV', 'RHOHV_CORR', rho_corr, replace_existing=True)
     logger.info('RHOHV corrected.')
 
-    # Get velocity field texture and noise threshold. (~3min to execute this function)
-    # vel_texture, noise_threshold = radar_codes.get_texture(radar)
-    # radar.add_field_like('VEL', 'TEXTURE', vel_texture, replace_existing = True)
-    # logger.info('Texture computed.')
-
     # Get filter
     gatefilter = radar_codes.do_gatefilter(radar, rhohv_name='RHOHV_CORR')
     logger.info('Filter initialized.')
@@ -354,11 +244,6 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # PHIDP refolded.
     phidp_ref = phase_codes.refold_phidp(radar)
     radar.add_field_like('PHIDP', 'PHIDP', phidp_ref, replace_existing=True)
-
-    # KDP from disdrometer.
-    # kdp_simu, phidp_simu = phase_codes.kdp_phidp_disdro_darwin(radar, refl_field="DBZ", zdr_field="ZDR")
-    # radar.add_field('KDP_SIM', kdp_simu, replace_existing=True)
-    # radar.add_field('PHIDP_SIM', phidp_simu, replace_existing=True)
 
     # Estimate KDP
     try:
@@ -419,9 +304,6 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     hydro_class = radar_codes.hydrometeor_classification(radar)
     radar.add_field('radar_echo_classification', hydro_class, replace_existing=True)
     logger.info('Hydrometeors classification estimated.')
-    # Check if Hail it found hail.
-    # if (hydro_class['data'] == 9).sum() != 0:
-    #     print("WARNING: hail detection in Darwin. NOT POSSIBLE!", os.path.basename(outfilename))
 
     # Rainfall rate
     rainfall = radar_codes.rainfall_rate(radar)
@@ -434,19 +316,20 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.add_field("NW", nw_dict)
     logger.info('DSD estimated.')
 
-    # Liquid/Ice Mass
-    # We decided to not give these products.
-    # liquid_water_mass, ice_mass = radar_codes.liquid_ice_mass(radar)
-    # radar.add_field('LWC', liquid_water_mass)
-    # radar.add_field('IWC', ice_mass)
-    # logger.info('Liquid/Ice mass estimated.')
-
-    # Check if NCP field is fake.
+    # Removing fake fields.
     if fake_ncp:
         radar.fields.pop('NCP')
 
+    if fake_rhohv:
+        radar.fields.pop("RHOHV")
+        radar.fields.pop("RHOHV_CORR")
+
+    # Removing useless fields:
+    radar.fields.pop("PHIDP_BRINGI")
+    radar.fields.pop("KDP_BRINGI")
+
     # Rename fields to pyart defaults.
-    radar = rename_radar_fields(radar)
+    radar = radar_codes.rename_radar_fields(radar)
 
     # Treatment is finished!
     end_time = time.time()

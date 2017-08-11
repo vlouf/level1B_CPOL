@@ -91,9 +91,9 @@ def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
 
     rng2d, az2d = np.meshgrid(radar.range['data'], radar.azimuth['data'])
     dr = (r[1] - r[0])  # m
-    window_size = dr/1000*4  # in km!!!
+    window_size = dr / 1000 * 4  # in km!!!
 
-    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d/1000.0, gs=dr, window=window_size, bad=-9999)
+    kdN, fdN, sdN = csu_kdp.calc_kdp_bringi(phidp, refl, rng2d / 1000.0, gs=dr, window=window_size, bad=-9999)
 
     fdN = np.ma.masked_where(fdN == -9999, fdN)
     kdN = np.ma.masked_where(kdN == -9999, kdN)
@@ -240,9 +240,14 @@ def refold_phidp(radar, phidp_name='PHIDP'):
             Refolded PHIDP.
     """
     phi = deepcopy(radar.fields[phidp_name]['data'])
-    pos = (phi > 80)
-    phi[pos] -= 90
-    phi[~pos] += 90
+    pos = (phi > 0)
+
+    if np.nanmin(phi) < 100:
+        phi[pos] -= 180
+        phi[~pos] += 180
+    else:
+        phi[pos] -= 90
+        phi[~pos] += 90
 
     return phi
 
