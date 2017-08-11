@@ -32,7 +32,6 @@ from multiprocessing import Pool
 import matplotlib
 matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
 
-import pyart
 import crayons  # For the welcoming message only.
 import numpy as np
 import pandas as pd
