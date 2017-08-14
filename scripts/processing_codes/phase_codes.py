@@ -61,6 +61,55 @@ def _kdp_from_phidp_finitediff(phidp, L=7, dr=1.):
     return kdp / 2. / dr
 
 
+# adapted smooth and trim function to work with 2dimensional arrays
+def _smooth_and_trim_scan(x, window_len=35, window='hanning'):
+    """
+    Smooth data using a window with requested size.
+    This method is based on the convolution of a scaled window with the signal.
+    The signal is prepared by introducing reflected copies of the signal
+    (with the window size) in both ends so that transient parts are minimized
+    in the begining and end part of the output signal.
+    Parameters
+    ----------
+    x : ndarray
+        The input signal
+    window_len: int
+        The dimension of the smoothing window; should be an odd integer.
+    window : str
+        The type of window from 'flat', 'hanning', 'hamming', 'bartlett',
+        'blackman' or 'sg_smooth'. A flat window will produce a moving
+        average smoothing.
+    Returns
+    -------
+    y : ndarray
+        The smoothed signal with length equal to the input signal.
+    """
+    from scipy.ndimage.filters import convolve1d
+
+    if x.ndim != 2:
+        raise ValueError("smooth only accepts 2 dimension arrays.")
+    if x.shape[1] < window_len:
+        mess = "Input dimension 1 needs to be bigger than window size."
+        raise ValueError(mess)
+    if window_len < 3:
+        return x
+    valid_windows = ['flat', 'hanning', 'hamming', 'bartlett', 'blackman',
+                     'sg_smooth']
+    if window not in valid_windows:
+        raise ValueError("Window is on of " + ' '.join(valid_windows))
+
+    if window == 'flat':  # moving average
+        w = np.ones(int(window_len), 'd')
+    elif window == 'sg_smooth':
+        w = np.array([0.1, .25, .3, .25, .1])
+    else:
+        w = eval('np.' + window + '(window_len)')
+
+    y = convolve1d(x, w / w.sum(), axis=1)
+
+    return y
+
+
 def bringi_phidp_kdp(radar, gatefilter, refl_name='DBZ', phidp_name='PHIDP'):
     """
     Compute PHIDP and KDP using Bringi's algorithm.
@@ -221,6 +270,8 @@ def phidp_giangrande(radar, gatefilter, refl_field='DBZ', ncp_field='NCP',
                                                    phidp_field=phidp_field,
                                                    kdp_field=kdp_field)
 
+    phidp_gg = _smooth_and_trim_scan(phidp_gg.T, window_len=5).T
+    
     return phidp_gg, kdp_gg
 
 
@@ -251,3 +302,29 @@ def refold_phidp(radar, phidp_name='PHIDP'):
         phi[~pos] += 90
 
     return phi
+
+
+def smooth_phidp(radar, phidp_name='PHIDP'):
+    """
+    PHIDP estimation by smoothing its derivative.
+
+    Parameters:
+    ===========
+        radar:
+            Py-ART radar structure.
+        phidp_name: str
+            PHIDP field name.
+
+    Returns:
+    ========
+        nphi: array
+            Refolded PHIDP.
+    """
+    phi = deepcopy(radar.fields[phidp_name]['data'])
+    nphi = _smooth_and_trim_scan(phi, window_len=10)
+    kdp = np.gradient(nphi, axis=1)
+    kdp[kdp < 0] = 0
+    nphi = np.cumsum(kdp, axis=1) * .25
+    nphi = _smooth_and_trim_scan(nphi.T, window_len=15).T
+
+    return nphi

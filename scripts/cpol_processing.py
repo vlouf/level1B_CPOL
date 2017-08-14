@@ -84,7 +84,12 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
 
         gr.plot_ppi('differential_reflectivity', ax=the_ax[3])
         gr.plot_ppi('corrected_differential_reflectivity', ax=the_ax[4], gatefilter=gatefilter)
-        gr.plot_ppi('cross_correlation_ratio', ax=the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
+
+        # Seasons 0910: No RHOHV available.
+        try:
+            gr.plot_ppi('cross_correlation_ratio', ax=the_ax[5], norm=colors.LogNorm(vmin=0.5, vmax=1.05))
+        except KeyError:
+            pass
 
         gr.plot_ppi('giangrande_corrected_differential_phase', ax=the_ax[6],
                     gatefilter=gatefilter, vmin=-360, vmax=360,
@@ -241,8 +246,12 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.add_field_like('ZDR', 'ZDR_CORR', corr_zdr, replace_existing=True)
 
     # PHIDP refolded.
-    phidp_ref = phase_codes.refold_phidp(radar)
-    radar.add_field_like('PHIDP', 'PHIDP', phidp_ref, replace_existing=True)
+    if year != 2011:
+        phidp_ref = phase_codes.refold_phidp(radar)
+        radar.add_field_like('PHIDP', 'PHIDP', phidp_ref, replace_existing=True)
+    else:
+        phidp_ref = phase_codes.smooth_phidp(radar)
+        radar.add_field_like('PHIDP', 'PHIDP', phidp_ref, replace_existing=True)
 
     # Estimate KDP
     try:
