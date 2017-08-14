@@ -269,9 +269,9 @@ def phidp_giangrande(radar, gatefilter, refl_field='DBZ', ncp_field='NCP',
                                                    rhv_field=rhv_field,
                                                    phidp_field=phidp_field,
                                                    kdp_field=kdp_field)
+    phi = phidp_gg['data']
+    phidp_gg['data'] = _smooth_and_trim_scan(phi.T, window_len=5).T
 
-    phidp_gg = _smooth_and_trim_scan(phidp_gg.T, window_len=5).T
-    
     return phidp_gg, kdp_gg
 
 
