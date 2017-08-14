@@ -246,7 +246,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.add_field_like('ZDR', 'ZDR_CORR', corr_zdr, replace_existing=True)
 
     # PHIDP refolded.
-    if year != 2011:
+    if radar_start_date.year != 2011:
         phidp_ref = phase_codes.refold_phidp(radar)
         radar.add_field_like('PHIDP', 'PHIDP', phidp_ref, replace_existing=True)
     else:
