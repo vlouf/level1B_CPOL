@@ -171,6 +171,7 @@ def correct_attenuation_zh_pyart(radar, refl_field='DBZ', ncp_field='NCP', rhv_f
             Attenuation corrected reflectivity.
     """
     atten_meta, zh_corr = pyart.correct.calculate_attenuation(radar, 0,
+                                                              rhv_min=0.5,
                                                               refl_field=refl_field,
                                                               ncp_field=ncp_field,
                                                               rhv_field=rhv_field,
