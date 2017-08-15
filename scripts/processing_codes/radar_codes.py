@@ -557,7 +557,6 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL', rh
             Unfolded Doppler velocity.
     """
     gf = deepcopy(my_gatefilter)
-    gf.exclude_below(rhohv_name, 0.8)
     # Trying to determine Nyquist velocity
     try:
         v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]

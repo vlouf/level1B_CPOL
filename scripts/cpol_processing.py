@@ -21,7 +21,7 @@ import logging
 import datetime
 import traceback
 
-# Other Libraries -- Matplotlib must be imported first
+# Other Libraries -- Matplotlib must be imported before pyart.
 import netCDF4
 import numpy as np
 import matplotlib
@@ -139,15 +139,15 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
 
     PLAN:
     =====
-        1/ Get Logger.
-        2/ Generate output file name. Check if output file already exists.
-        3/ Read input radar file.
-        4/ Check if radar file OK (no problem with azimuth and reflectivity).
-        5/ Get radar date.
-        6/ Check if NCP field exists (creating a fake one if it doesn't)
-        7/ Check if RHOHV field exists (creating a fake one if it doesn't)
-        8/ Compute SNR and temperature using radiosoundings.
-        9/ Correct RHOHV using Ryzhkov algorithm.
+        01/ Get Logger.
+        02/ Generate output file name. Check if output file already exists.
+        03/ Read input radar file.
+        04/ Check if radar file OK (no problem with azimuth and reflectivity).
+        05/ Get radar date.
+        06/ Check if NCP field exists (creating a fake one if it doesn't)
+        07/ Check if RHOHV field exists (creating a fake one if it doesn't)
+        08/ Compute SNR and temperature using radiosoundings.
+        09/ Correct RHOHV using Ryzhkov algorithm.
         10/ Create gatefilter (remove noise and incorrect data).
         11/ Correct ZDR using Ryzhkov algorithm.
         12/ Process and unfold raw PHIDP using wradlib and Vulpiani algorithm.

@@ -34,7 +34,7 @@ matplotlib.use('Agg')  # <- Reason why matplotlib is imported first.
 
 import crayons  # For the welcoming message only.
 import numpy as np
-import pandas as pd
+import pandas as pd  # Using only 1 function from pandas, should drop dependency.
 
 # Custom modules.
 import cpol_processing
