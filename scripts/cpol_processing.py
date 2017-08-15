@@ -178,6 +178,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     datestr = radar_start_date.strftime("%Y%m%d_%H%M")
     logger.info("%s read.", radar_file_name)
     radar.time['units'] = radar.time['units'].replace("since", "since ")
+
     # Correct Doppler velocity units.
     radar.fields['VEL']['units'] = "m/s"
     radar.fields['VEL']['standard_name'] = "radial_velocity"
@@ -210,8 +211,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         fake_rhohv = True
 
     if fake_rhohv:
-        radar.metadata['debug_info'] = 'RHOHV field does not exist in RAW data. ' +\
-                                       'A fake RHOHV field has been used to process this file. Be careful.'
+        radar.metadata['debug_info'] = 'RHOHV field does not exist in RAW data. Using fake RHOHV.'
         logger.critical("RHOHV field not found, creating a fake RHOHV")
 
     # Compute SNR
@@ -310,9 +310,6 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     if fake_rhohv:
         radar.fields.pop("RHOHV")
         radar.fields.pop("RHOHV_CORR")
-
-    radar.fields.pop("PHIDP_BRINGI")
-    radar.fields.pop("KDP_BRINGI")
 
     # Rename fields to pyart defaults.
     radar = radar_codes.rename_radar_fields(radar)
