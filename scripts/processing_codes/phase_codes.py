@@ -3,6 +3,7 @@ from copy import deepcopy
 
 # Other Libraries
 import pyart
+import wradlib
 import numpy as np
 
 from numba import jit, int32, float32
@@ -328,3 +329,29 @@ def smooth_phidp(radar, phidp_name='PHIDP'):
     nphi = _smooth_and_trim_scan(nphi.T, window_len=15).T
 
     return nphi
+
+
+def wradlib_unfold_phidp(radar, phidp_name="PHIDP"):
+    """
+    Processing raw PHIDP using Vulpiani algorithm in Wradlib.
+
+    Parameters:
+    ===========
+    radar:
+        Py-ART radar structure.
+    phidp_name: str
+        PHIDP field name.
+
+    Returns:
+    ========
+        newphi: array
+            Refolded PHIDP.
+        newkdp: arrau
+            KDP estimation.
+    """
+    phi = deepcopy(radar.fields[phidp_name]['data'])
+    r_range = radar.range['data'] / 1000.0
+    dr = r_range[2] - r_range[1]
+    newphi, newkdp = wradlib.dp.process_raw_phidp_vulpiani(phi, dr, L=15, niter=2,)
+
+    return newphi, newkdp
