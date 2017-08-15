@@ -1,13 +1,43 @@
+"""
+Codes for gridding radar data using Py-ART.
+
+@title: gridding_codes
+@author: Valentin Louf <valentin.louf@monash.edu>
+@institutions: Monash University and the Australian Bureau of Meteorology
+@date: 15/08/2017
+
+.. autosummary::
+    :toctree: generated/
+
+    _get_latlon
+    gridding_radar_150km
+    gridding_radar_70km
+"""
 # Python Standard Library
 import os
 import datetime
 
 # Other Libraries
-import numpy as np
 import pyart
+import numpy as np
 
 
 def _get_latlon(radgrid):
+    """
+    Generates lattitude and longitude arrays.
+
+    Parameters:
+    ===========
+    radgrid: struct
+        Py-ART grid object.
+
+    Returns:
+    ========
+    longitude: ndarray
+        Array of coordinates for all points.
+    latitude: ndarray
+        Array of coordinates for all points.
+    """
     # Declare array, filled 0 in order to not have a masked array.
     lontot = np.zeros_like(radgrid.fields['corrected_reflectivity']['data'].filled(0))
     lattot = np.zeros_like(radgrid.fields['corrected_reflectivity']['data'].filled(0))
@@ -26,7 +56,7 @@ def _get_latlon(radgrid):
 
 def gridding_radar_150km(radar, radar_date, outpath):
     """
-    Map a single radar to a Cartesian grid of 70 km range and 1 km resolution.
+    Map a single radar to a Cartesian grid of 150 km range and 2.5 km resolution.
 
     Parameters:
     ===========
@@ -34,6 +64,8 @@ def gridding_radar_150km(radar, radar_date, outpath):
             Py-ART radar structure.
         radar_date: datetime
             Datetime stucture of the radar data.
+        outpath: str
+            Ouput directory.
     """
     # Extracting year, date, and datetime.
     year = str(radar_date.year)
@@ -81,7 +113,7 @@ def gridding_radar_150km(radar, radar_date, outpath):
 
 def gridding_radar_70km(radar, radar_date, outpath):
     """
-    Map a single radar to a Cartesian grid of 150 km range and 2.5km resolution.
+    Map a single radar to a Cartesian grid of 70 km range and 1 km resolution.
 
     Parameters:
     ===========
@@ -91,6 +123,8 @@ def gridding_radar_70km(radar, radar_date, outpath):
             The Gate filter.
         radar_date: datetime
             Datetime stucture of the radar data.
+        outpath: str
+            Ouput directory.
     """
     # Extracting year, date, and datetime.
     year = str(radar_date.year)

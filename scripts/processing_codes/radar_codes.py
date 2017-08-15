@@ -10,21 +10,26 @@ Codes for correcting and estimating various radar and meteorological parameters.
 .. autosummary::
     :toctree: generated/
 
-    _unfold_phidp
-    _refold_vdop
-    bringi_phidp_kdp
+    _my_snr_from_reflectivity
+    _nearest
+    _get_noise_threshold
+    check_azimuth
+    check_reflectivity
     correct_rhohv
     correct_zdr
     do_gatefilter
-    estimate_kdp
+    dsd_retrieval
+    get_texture
+    filter_hardcoding
+    get_field_names
     hydrometeor_classification
-    kdp_from_phidp_finitediff
     liquid_ice_mass
-    nearest
-    phidp_giangrande
+    rainfall_rate
+    read_radar
+    refold_velocity
+    rename_radar_fields
     snr_and_sounding
-    unfold_phidp_vdop
-    unfold_velocity
+    unfold_velocity    
 """
 # Python Standard Library
 import os
@@ -768,41 +773,3 @@ def unfold_velocity(radar, my_gatefilter, bobby_params=False, vel_name='VEL', rh
     vdop_vel['description'] = "Velocity unfolded using Py-ART region based dealiasing algorithm."
 
     return vdop_vel
-
-
-def unfold_velocity_bis(radar, my_gatefilter, vel_name='VEL'):
-    """
-    Unfold Doppler velocity using Py-ART the unwrap phase algorithm.
-
-    Parameters:
-    ===========
-        radar:
-            Py-ART radar structure.
-        my_gatefilter:
-            GateFilter
-        vel_name: str
-            Name of the (original) Doppler velocity field.
-
-    Returns:
-    ========
-        vel_dealias: dict
-            Unfolded Doppler velocity.
-    """
-    try:
-        v_nyq_vel = radar.instrument_parameters['nyquist_velocity']['data'][0]
-    except (KeyError, IndexError):
-        vdop_art = radar.fields[vel_name]['data']
-        v_nyq_vel = np.max(np.abs(vdop_art))
-
-    vel_dealias = pyart.correct.dealias_unwrap_phase(radar,
-                                                     unwrap_unit='sweep',
-                                                     keep_original=True,
-                                                     nyquist_velocity=v_nyq_vel,
-                                                     skip_checks=True,
-                                                     gatefilter=my_gatefilter,
-                                                     vel_field=vel_name)
-
-    vel_dealias['units'] = "m/s"
-    vel_dealias['description'] = "Velocity unfolded using Py-ART dealias phase unwraping algorithm."
-
-    return vel_dealias

@@ -1,9 +1,25 @@
+"""
+Codes for correcting and unfolding PHIDP as well as estimating KDP.
+
+@title: phase_codes
+@author: Valentin Louf <valentin.louf@monash.edu>
+@institutions: Monash University and the Australian Bureau of Meteorology
+@date: 15/08/2017
+
+.. autosummary::
+    :toctree: generated/
+
+    phidp_giangrande
+    wradlib_unfold_phidp
+"""
+
 # Python Standard Library
 from copy import deepcopy
 
 # Other Libraries
 import pyart
-import wradlib
+
+from wradlib.dp import process_raw_phidp_vulpiani
 
 
 def phidp_giangrande(radar, gatefilter, refl_field='DBZ', ncp_field='NCP',
@@ -42,9 +58,6 @@ def phidp_giangrande(radar, gatefilter, refl_field='DBZ', ncp_field='NCP',
                                                    rhv_field=rhv_field,
                                                    phidp_field=phidp_field,
                                                    kdp_field=kdp_field)
-    phi = phidp_gg['data']
-    phidp_gg['data'] = _smooth_and_trim_scan(phi.T, window_len=5).T
-
     return phidp_gg, kdp_gg
 
 
@@ -61,14 +74,14 @@ def wradlib_unfold_phidp(radar, phidp_name="PHIDP"):
 
     Returns:
     ========
-        newphi: array
-            Refolded PHIDP.
-        newkdp: arrau
-            KDP estimation.
+    newphi: array
+        Refolded PHIDP.
+    newkdp: array
+        KDP estimation.
     """
     phi = deepcopy(radar.fields[phidp_name]['data'])
     r_range = radar.range['data'] / 1000.0
     dr = r_range[2] - r_range[1]
-    newphi, newkdp = wradlib.dp.process_raw_phidp_vulpiani(phi, dr)
+    newphi, newkdp = process_raw_phidp_vulpiani(phi, dr)
 
     return newphi, newkdp

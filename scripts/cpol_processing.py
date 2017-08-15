@@ -4,14 +4,13 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 11/08/2017
-@version: 0.99
+@date: 15/08/2017
+@version: 0.999
 
 .. autosummary::
     :toctree: generated/
 
-    plot_figure_check
-    rename_radar_fields
+    plot_figure_check    
     production_line
 """
 # Python Standard Library

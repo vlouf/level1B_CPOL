@@ -1,3 +1,18 @@
+"""
+Misceallaneous functions.
+
+@title: raijin_tools
+@author: Valentin Louf <valentin.louf@monash.edu>
+@institutions: Monash University and the Australian Bureau of Meteorology
+@date: 15/08/2017
+
+.. autosummary::
+    :toctree: generated/
+
+    get_files
+    get_season
+"""
+# Python Standard Library
 import os
 import datetime
 import numpy as np
