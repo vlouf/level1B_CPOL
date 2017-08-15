@@ -10,7 +10,7 @@ CPOL Level 1b main production line.
 .. autosummary::
     :toctree: generated/
 
-    plot_figure_check    
+    plot_figure_check
     production_line
 """
 # Python Standard Library
@@ -136,6 +136,34 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
             Path for saving figures.
         sound_dir: str
             Path to radiosoundings directory.
+
+    PLAN:
+    =====
+        1/ Get Logger.
+        2/ Generate output file name. Check if output file already exists.
+        3/ Read input radar file.
+        4/ Check if radar file OK (no problem with azimuth and reflectivity).
+        5/ Get radar date.
+        6/ Check if NCP field exists (creating a fake one if it doesn't)
+        7/ Check if RHOHV field exists (creating a fake one if it doesn't)
+        8/ Compute SNR and temperature using radiosoundings.
+        9/ Correct RHOHV using Ryzhkov algorithm.
+        10/ Create gatefilter (remove noise and incorrect data).
+        11/ Correct ZDR using Ryzhkov algorithm.
+        12/ Process and unfold raw PHIDP using wradlib and Vulpiani algorithm.
+        13/ Compute Giangrande's PHIDP using pyart.
+        14/ Unfold velocity using pyart.
+        15/ Compute attenuation for ZH
+        16/ Compute attenuation for ZDR
+        17/ Estimate Hydrometeors classification using csu toolbox.
+        18/ Estimate Rainfall rate using csu toolbox.
+        19/ Estimate DSD retrieval using csu toolbox.
+        20/ Removing fake/temporary fieds.
+        21/ Rename fields to pyart standard names.
+        22/ Plotting figure quicklooks.
+        23/ Hardcoding gatefilter.
+        24/ Writing output cf/radial file.
+        25/ Writing output gridded data.
     """
     # Get logger.
     logger = logging.getLogger()
