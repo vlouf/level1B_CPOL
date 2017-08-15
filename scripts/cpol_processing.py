@@ -245,34 +245,16 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     corr_zdr = radar_codes.correct_zdr(radar)
     radar.add_field_like('ZDR', 'ZDR_CORR', corr_zdr, replace_existing=True)
 
-    # PHIDP refolded.
-    if radar_start_date.year != 2011:
-        phidp_ref = phase_codes.refold_phidp(radar)
-        radar.add_field_like('PHIDP', 'PHIDP', phidp_ref, replace_existing=True)
-    else:
-        phidp_ref = phase_codes.smooth_phidp(radar)
-        radar.add_field_like('PHIDP', 'PHIDP', phidp_ref, replace_existing=True)
-
-    # Estimate KDP
-    try:
-        radar.fields['KDP']
-        logger.info('KDP already exists')
-    except KeyError:
-        logger.info('We need to estimate KDP')
-        kdp_con = phase_codes.estimate_kdp(radar, gatefilter)
-        radar.add_field('KDP', kdp_con, replace_existing=True)
-        logger.info('KDP estimated.')
-
-    # Bringi PHIDP/KDP
-    phidp_bringi, kdp_bringi = phase_codes.bringi_phidp_kdp(radar, gatefilter)
-    radar.add_field_like('PHIDP', 'PHIDP_BRINGI', phidp_bringi, replace_existing=True)
-    radar.add_field_like('KDP', 'KDP_BRINGI', kdp_bringi, replace_existing=True)
-    radar.fields['PHIDP_BRINGI']['long_name'] = "bringi_differential_phase"
-    radar.fields['KDP_BRINGI']['long_name'] = "bringi_specific_differential_phase"
-    logger.info('KDP/PHIDP Bringi estimated.')
+    # PHIDP unfolded. KDP estimation.
+    newphi, newkdp = phase_codes.wradlib_unfold_phidp(radar, phidp_name="PHIDP")
+    kdp_meta = pyart.config.get_metadata("specific_differential_phase")
+    kdp_meta['data'] = newkdp
+    radar.add_field_like("PHIDP", "PHIDP", newphi, replace_existing=True)
+    radar.add_field("KDP", kdp_meta, replace_existing=True)
+    logger.info("PHIDP unfloded. KDP estimated.")
 
     # Giangrande PHIDP/KDP
-    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP_BRINGI')
+    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP')
     radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
     radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
     radar.fields['PHIDP_GG']['long_name'] = "giangrande_differential_phase"
