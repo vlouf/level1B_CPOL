@@ -121,9 +121,15 @@ def production_line_multiproc(mydate):
 
     # Checking if output directory exists. Creating them otherwise.
     if not os.path.isdir(os.path.join(OUTPATH, year)):
-        os.mkdir(os.path.join(OUTPATH, year))
+        try:
+            os.mkdir(os.path.join(OUTPATH, year))
+        except FileExistsError:
+            pass
     if not os.path.isdir(outdir):
-        os.mkdir(outdir)
+        try:
+            os.mkdir(outdir)
+        except FileExistsError:
+            pass
 
     # List netcdf files in directory.
     flist = raijin_tools.get_files(indir, mydate)

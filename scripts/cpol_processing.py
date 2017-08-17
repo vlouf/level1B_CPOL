@@ -60,9 +60,15 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
 
     # Checking if output directory exists. Creating them otherwise.
     if not os.path.isdir(os.path.join(figure_path, year)):
-        os.mkdir(os.path.join(figure_path, year))
+        try:
+            os.mkdir(os.path.join(figure_path, year))
+        except FileExistsError:
+            pass
     if not os.path.isdir(outfile_path):
-        os.mkdir(outfile_path)
+        try:
+            os.mkdir(outfile_path)
+        except FileExistsError:
+            pass
 
     # Checking if figure already exists.
     outfile = os.path.basename(outfilename)
