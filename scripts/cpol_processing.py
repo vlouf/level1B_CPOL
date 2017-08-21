@@ -4,7 +4,7 @@ CPOL Level 1b main production line.
 @title: CPOL_PROD_1b
 @author: Valentin Louf <valentin.louf@monash.edu>
 @institution: Bureau of Meteorology
-@date: 15/08/2017
+@date: 21/08/2017
 @version: 0.999
 
 .. autosummary::
@@ -195,6 +195,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # Start chronometer.
     start_time = time.time()
 
+    # !!! READING THE RADAR !!!
     radar = radar_codes.read_radar(radar_file_name)
 
     # Check if radar scan is complete.
@@ -206,7 +207,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         logger.error("MAJOR ERROR: %s reflectivity field is empty.", radar_file_name)
         return None
 
-    # Get radar's data date and time.
+    # Getting radar's date and time.
     radar_start_date = netCDF4.num2date(radar.time['data'][0], radar.time['units'].replace("since", "since "))
     datestr = radar_start_date.strftime("%Y%m%d_%H%M")
     logger.info("%s read.", radar_file_name)
@@ -233,7 +234,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # For CPOL, season 09/10, there are no RHOHV fields before March!!!!
     try:
         radar.fields['RHOHV']
-        fake_rhohv = False
+        fake_rhohv = False  # Don't need to delete this field cause it's legit.
     except KeyError:
         # Creating a fake RHOHV field.
         tmp = np.zeros_like(radar.fields['DBZ']['data']) + 1
@@ -241,7 +242,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         rho_meta['data'] = tmp
         rho_meta['description'] = "THIS FIELD IS FAKE. DO NOT USE IT!"
         radar.add_field('RHOHV', rho_meta)
-        fake_rhohv = True
+        fake_rhohv = True  # We delete this fake field later.
 
     if fake_rhohv:
         radar.metadata['debug_info'] = 'RHOHV field does not exist in RAW data. Using fake RHOHV.'
