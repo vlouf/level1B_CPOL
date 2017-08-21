@@ -35,6 +35,7 @@ from processing_codes import radar_codes
 from processing_codes import atten_codes
 from processing_codes import phase_codes
 from processing_codes import gridding_codes
+from processing_codes import hydro_codes
 
 
 def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
@@ -322,17 +323,17 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     logger.info('Attenuation on ZDR corrected.')
 
     # Hydrometeors classification
-    hydro_class = radar_codes.hydrometeor_classification(radar)
+    hydro_class = hydro_codes.hydrometeor_classification(radar)
     radar.add_field('radar_echo_classification', hydro_class, replace_existing=True)
     logger.info('Hydrometeors classification estimated.')
 
     # Rainfall rate
-    rainfall = radar_codes.rainfall_rate(radar)
+    rainfall = hydro_codes.rainfall_rate(radar)
     radar.add_field("radar_estimated_rain_rate", rainfall)
     logger.info('Rainfall rate estimated.')
 
     # DSD retrieval
-    nw_dict, d0_dict = radar_codes.dsd_retrieval(radar)
+    nw_dict, d0_dict = hydro_codes.dsd_retrieval(radar)
     radar.add_field("D0", d0_dict)
     radar.add_field("NW", nw_dict)
     logger.info('DSD estimated.')
