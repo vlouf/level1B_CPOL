@@ -10,6 +10,7 @@ CPOL Level 1b main production line.
 .. autosummary::
     :toctree: generated/
 
+    correct_output_filename
     plot_figure_check
     production_line
 """
@@ -36,6 +37,35 @@ from processing_codes import atten_codes
 from processing_codes import phase_codes
 from processing_codes import gridding_codes
 from processing_codes import hydro_codes
+
+
+def correct_output_filename(outfilename):
+    """
+    Some level 0 and/or level 1a treatment did not generate the right file names.
+    Correcting these here.
+
+    Parameter:
+    ==========
+    outfilename: str
+        Output file name.
+
+    Returns:
+    ========
+    outfilename: str
+        Corrected output file name.
+    """
+    outfilename = outfilename.replace("level1a", "level1b")
+
+    # Correct occasional missing suffix.
+    if "level1b" not in outfilename:
+        outfilename = outfilename.replace(".nc", "_level1b.nc")
+    # Correct an occasional mislabelling from RadX.
+    if "SURV" in outfilename:
+        outfilename = outfilename.replace("SURV", "PPI")
+    if "SUR" in outfilename:
+        outfilename = outfilename.replace("SUR", "PPI")
+
+    return outfilename
 
 
 def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
@@ -176,16 +206,9 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     logger = logging.getLogger()
     # Generate output file name.
     outfilename = os.path.basename(radar_file_name)
-    outfilename = outfilename.replace("level1a", "level1b")
+    if "cfrad" in outfilename:
+        outfilename = correct_output_filename(outfilename)
 
-    # Correct occasional missing suffix.
-    if "level1b" not in outfilename:
-        outfilename = outfilename.replace(".nc", "_level1b.nc")
-    # Correct an occasional mislabelling from RadX.
-    if "SURV" in outfilename:
-        outfilename = outfilename.replace("SURV", "PPI")
-    if "SUR" in outfilename:
-        outfilename = outfilename.replace("SUR", "PPI")
     outfilename = os.path.join(outpath, outfilename)
 
     # Check if output file already exists.
