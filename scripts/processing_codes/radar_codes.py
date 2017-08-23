@@ -488,12 +488,12 @@ def snr_and_sounding(radar, soundings_dir=None, refl_field_name='DBZ'):
         sonde_name = fnmatch.filter(all_sonde_files, sonde_pattern)[0]
     except IndexError:
         # The radiosoundings for the exact date does not exist, looking for the closest date.
-        print("Sounding file not found, looking for the nearest date.")
+        # print("Sounding file not found, looking for the nearest date.")
         dtime = [datetime.datetime.strptime(dt, 'YPDN_%Y%m%d_%H.nc') for dt in all_sonde_files]
         closest_date = _nearest(dtime, radar_start_date)
         sonde_name = os.path.join(soundings_dir, "YPDN_{}.nc".format(closest_date.strftime("%Y%m%d_%H")))
 
-    print("Reading radiosounding %s" % (sonde_name))
+    # print("Reading radiosounding %s" % (sonde_name))
     interp_sonde = netCDF4.Dataset(os.path.join(soundings_dir, sonde_name))
     temperatures = interp_sonde.variables['temp'][:]
     temperatures[(temperatures < -100) | (temperatures > 100)] = np.NaN

@@ -86,6 +86,7 @@ def production_line_manager(radar_file_name, outpath, outpath_grid, figure_path,
     except Exception:
         print("Exception in production line code:")
         print("-" * 60)
+        print("ERROR IN FILE {}.".format(radar_file_name))
         traceback.print_exc(file=sys.stdout)
         print("-" * 60)
         logging.error("Failed to process file", exc_info=True)
