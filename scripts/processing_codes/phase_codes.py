@@ -239,10 +239,11 @@ def estimate_kdp_sobel(radar, window_len=7, phidp_name="PHIDP", rhohv_name="RHOH
     kdp = (scipy.ndimage.filters.convolve1d(phidp, sobel, axis=1) / ((window_len / 3.0) * 2.0 * gate_spacing))
 
     # Removing aberrant values.
-    kdp[kdp < -2] = 0
-    kdp[kdp > 20] = 0
+    kdp[kdp < -4] = 0
+    kdp[kdp > 10] = 0
+    kdp[:, :40] = 0
     # Close to radar == 0
-    kdp = np.ma.masked_where(rhohv < 0.85, phidp)
+    kdp = np.ma.masked_where(rhohv < 0.85, kdp)    
 
     kdp_meta = pyart.config.get_metadata('specific_differential_phase')
     kdp_meta['data'] = kdp
