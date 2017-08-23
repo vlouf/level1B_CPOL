@@ -52,7 +52,7 @@ def _kdp_sobel(phidp, dr=0.25, L=7):
     # Compute KDP.
     kdp = (scipy.ndimage.filters.convolve1d(phidp, sobel, axis=1) / ((window_len / 3.0) * 2.0 * gate_spacing))
     # Smooth KDP alongside the azimuth.
-    kdp = pyart.correct.phase_proc.smooth_and_trim_scan(kdp.T, window_len=3).T
+    # kdp = pyart.correct.phase_proc.smooth_and_trim_scan(kdp.T, window_len=3).T
     return kdp
 
 
@@ -198,6 +198,51 @@ def _unfold_phi_vulpiani(phidp, kdp):
             pass
 
     return phidp.reshape(shape)
+
+
+def estimate_kdp_sobel(radar, window_len=7, phidp_name="PHIDP"):
+    """
+    Compute KDP from PHIDP using a Sobel filter. Inspired from a bit of PyART
+    code.
+
+    Parameters:
+    ===========
+    radar: dict
+        Py-ART radar structure.
+    window_len: int
+        Window length.
+    phidp_name: str
+        Default PHIDP name.
+
+    Returns:
+    ========
+    kdp_meta: dict
+        Specific differential phase dictionary.
+    """
+    # Extract data
+    phidp = radar.fields[phidp_name]['data'].copy()
+    r = radar.range['data']
+    dr = (r[1] - r[0]) / 1000  # km
+    gate_spacing = dr
+
+    # Smoothing PHIDP
+    phidp = pyart.correct.phase_proc.smooth_and_trim_scan(phidp)
+
+    # Create SOBEL window.
+    sobel = 2. * np.arange(window_len) / (window_len - 1.0) - 1.0
+    sobel = sobel / (abs(sobel).sum())
+    sobel = sobel[::-1]
+
+    # Compute KDP.
+    kdp = (scipy.ndimage.filters.convolve1d(phidp, sobel, axis=1) / ((window_len / 3.0) * 2.0 * gate_spacing))
+
+    # Removing aberrant values.
+    kdp[kdp < -2] = 0
+    kdp[kdp > 15] = 0
+    kdp_meta = pyart.config.get_metadata('specific_differential_phase')
+    kdp_meta['data'] = kdp
+
+    return kdp_meta
 
 
 def phidp_giangrande(radar, gatefilter, refl_field='DBZ', ncp_field='NCP',

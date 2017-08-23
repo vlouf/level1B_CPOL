@@ -250,7 +250,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         tmp = np.zeros_like(radar.fields['DBZ']['data']) + 1
         ncp_meta = pyart.config.get_metadata('normalized_coherent_power')
         ncp_meta['data'] = tmp
-        ncp_meta['description'] = "THIS FIELD IS FAKE. DO NOT USE IT!"
+        ncp_meta['description'] = "THIS FIELD IS FAKE AND SHOULD BE REMOVED. DO NOT USE IT!"
         radar.add_field('NCP', ncp_meta)
         fake_ncp = True
 
@@ -272,23 +272,32 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         radar.metadata['debug_info'] = 'RHOHV field does not exist in RAW data. Using fake RHOHV.'
         logger.critical("RHOHV field not found, creating a fake RHOHV")
 
-    # Compute SNR
+    # Compute SNR and extract radiosounding temperature.
     try:
         height, temperature, snr = radar_codes.snr_and_sounding(radar, sound_dir)
+        radar.add_field('temperature', temperature, replace_existing=True)
+        radar.add_field('height', height, replace_existing=True)
     except ValueError:
         traceback.print_exc()
         logger.error("Impossible to compute SNR")
         return None
 
-    radar.add_field('temperature', temperature, replace_existing=True)
-    radar.add_field('height', height, replace_existing=True)
-
+    # Looking for SNR
     try:
         radar.fields['SNR']
         logger.info('SNR already exists.')
     except KeyError:
         radar.add_field('SNR', snr, replace_existing=True)
         logger.info('SNR calculated.')
+
+    # Looking for KDP and estimating it.
+    try:
+        radar.fields['KDP']
+        logger.info('KDP already exists.')
+    except KeyError:
+        kdp = phase_codes.estimate_kdp_sobel(radar)
+        radar.add_field("KDP", kdp, replace_existing=True)
+        logger.info('KDP estimated.')
 
     # Correct RHOHV
     rho_corr = radar_codes.correct_rhohv(radar)
@@ -302,14 +311,6 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     # Correct ZDR
     corr_zdr = radar_codes.correct_zdr(radar)
     radar.add_field_like('ZDR', 'ZDR_CORR', corr_zdr, replace_existing=True)
-
-    # PHIDP unfolded. KDP estimation.
-    newphi, newkdp = phase_codes.wradlib_unfold_phidp(radar, phidp_name="PHIDP")
-    kdp_meta = pyart.config.get_metadata("specific_differential_phase")
-    kdp_meta['data'] = newkdp
-    radar.add_field_like("PHIDP", "PHIDP", newphi, replace_existing=True)
-    radar.add_field("KDP", kdp_meta, replace_existing=True)
-    logger.info("PHIDP unfloded. KDP estimated.")
 
     # Giangrande PHIDP/KDP
     phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP')
