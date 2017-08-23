@@ -200,7 +200,7 @@ def _unfold_phi_vulpiani(phidp, kdp):
     return phidp.reshape(shape)
 
 
-def estimate_kdp_sobel(radar, window_len=7, phidp_name="PHIDP"):
+def estimate_kdp_sobel(radar, window_len=7, phidp_name="PHIDP", rhohv_name="RHOHV"):
     """
     Compute KDP from PHIDP using a Sobel filter. Inspired from a bit of PyART
     code.
@@ -221,6 +221,8 @@ def estimate_kdp_sobel(radar, window_len=7, phidp_name="PHIDP"):
     """
     # Extract data
     phidp = radar.fields[phidp_name]['data'].copy()
+    rhohv = radar.fields[rhohv_name]['data']
+    phidp = np.ma.masked_where(rhohv < 0.85, phidp)
     r = radar.range['data']
     dr = (r[1] - r[0]) / 1000  # km
     gate_spacing = dr
@@ -239,6 +241,9 @@ def estimate_kdp_sobel(radar, window_len=7, phidp_name="PHIDP"):
     # Removing aberrant values.
     kdp[kdp < -2] = 0
     kdp[kdp > 20] = 0
+    # Close to radar == 0
+    kdp = np.ma.masked_where(rhohv < 0.85, phidp)
+
     kdp_meta = pyart.config.get_metadata('specific_differential_phase')
     kdp_meta['data'] = kdp
 
