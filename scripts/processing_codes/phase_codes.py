@@ -226,7 +226,7 @@ def estimate_kdp_sobel(radar, window_len=7, phidp_name="PHIDP"):
     gate_spacing = dr
 
     # Smoothing PHIDP
-    phidp = pyart.correct.phase_proc.smooth_and_trim_scan(phidp)
+    phidp = pyart.correct.phase_proc.smooth_and_trim_scan(phidp, window_len=5)
 
     # Create SOBEL window.
     sobel = 2. * np.arange(window_len) / (window_len - 1.0) - 1.0
@@ -238,7 +238,7 @@ def estimate_kdp_sobel(radar, window_len=7, phidp_name="PHIDP"):
 
     # Removing aberrant values.
     kdp[kdp < -2] = 0
-    kdp[kdp > 15] = 0
+    kdp[kdp > 20] = 0
     kdp_meta = pyart.config.get_metadata('specific_differential_phase')
     kdp_meta['data'] = kdp
 
