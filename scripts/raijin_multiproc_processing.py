@@ -185,21 +185,19 @@ if __name__ == '__main__':
     # Main global variables (Path directories).
     # Input radar data directory
     INPATH = "/g/data2/rr5/vhl548/CPOL_level_1a"
-    # INPATH = "/g/data2/rr5/satellite/experiments/protat/SEAPOL"
     # Output directory for CF/Radial PPIs
     OUTPATH = "/g/data2/rr5/vhl548/NEW_CPOL_1B"
-    # OUTPATH = "/g/data2/rr5/vhl548/SEAPOL_1B"
-    # Output directory for GRIDDED netcdf data.
-    OUTPATH_GRID = os.path.join(OUTPATH, 'GRIDDED')
-    # Input directory for Radiosoundings (use my other script, named caprica to
-    # download and format these datas).
+    # Input directory for Radiosoundings
     SOUND_DIR = "/g/data2/rr5/vhl548/soudings_netcdf/"
-    # Output directory for verification figures.
-    FIGURE_CHECK_PATH = os.path.join(OUTPATH, 'FIGURE_CHECK')
     # Output directory for log files.
     LOG_FILE_PATH = "/short/kl02/vhl548/logfiles/"
     # Time in seconds for which each subprocess is allowed to live.
     TIME_BEFORE_DEATH = 600  # seconds before killing process.
+
+    # Output directory for verification figures.
+    FIGURE_CHECK_PATH = os.path.join(OUTPATH, 'FIGURE_CHECK')
+    # Output directory for GRIDDED netcdf data.
+    OUTPATH_GRID = os.path.join(OUTPATH, 'GRIDDED')
 
     # Check if paths exist.
     if not os.path.isdir(OUTPATH):
