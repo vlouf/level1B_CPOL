@@ -222,7 +222,7 @@ def correct_zdr(radar, zdr_name='ZDR', snr_name='SNR'):
     return corr_zdr
 
 
-def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP'):
+def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP', zdr_name="ZDR"):
     """
     Basic filtering
 
@@ -243,6 +243,7 @@ def do_gatefilter(radar, refl_name='DBZ', rhohv_name='RHOHV_CORR', ncp_name='NCP
     gf = pyart.filters.GateFilter(radar)
     gf.exclude_outside(refl_name, -30, 90)
     gf.exclude_below(rhohv_name, 0.5)
+    gf.exclude_outside(zdr_name, -3.0, 8.0)
 
     try:
         # NCP field is not present for older seasons.
