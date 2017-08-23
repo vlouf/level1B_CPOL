@@ -111,7 +111,6 @@ def production_line_multiproc(mydate):
     year = str(mydate.year)
     datestr = mydate.strftime("%Y%m%d")
     indir = os.path.join(INPATH, year, datestr)
-    outdir = os.path.join(OUTPATH, year, datestr)
 
     # Checking if input directory exists.
     if not os.path.exists(indir):
@@ -120,16 +119,16 @@ def production_line_multiproc(mydate):
         # return None
 
     # Checking if output directory exists. Creating them otherwise.
-    if not os.path.isdir(os.path.join(OUTPATH, year)):
-        try:
-            os.mkdir(os.path.join(OUTPATH, year))
-        except FileExistsError:
-            pass
-    if not os.path.isdir(outdir):
-        try:
-            os.mkdir(outdir)
-        except FileExistsError:
-            pass
+    outdir = os.path.join(OUTPATH, year)
+    try:
+        os.mkdir(outdir)
+    except FileExistsError:
+        pass
+    outdir = os.path.join(outdir, datestr)
+    try:
+        os.mkdir(outdir)
+    except FileExistsError:
+        pass
 
     # List netcdf files in directory.
     flist = raijin_tools.get_files(indir, mydate)
@@ -185,9 +184,11 @@ if __name__ == '__main__':
     """
     # Main global variables (Path directories).
     # Input radar data directory
-    INPATH = "/g/data2/rr5/vhl548/CPOL_level_1a"
+    # INPATH = "/g/data2/rr5/vhl548/CPOL_level_1a"
+    INPATH = "/g/data2/rr5/satellite/experiments/protat/SEAPOL"
     # Output directory for CF/Radial PPIs
-    OUTPATH = "/g/data2/rr5/vhl548/NEW_CPOL_1B"
+    # OUTPATH = "/g/data2/rr5/vhl548/NEW_CPOL_1B"
+    OUTPATH = "/g/data2/rr5/vhl548/SEAPOL_1B"
     # Output directory for GRIDDED netcdf data.
     OUTPATH_GRID = os.path.join(OUTPATH, 'GRIDDED')
     # Input directory for Radiosoundings (use my other script, named caprica to
