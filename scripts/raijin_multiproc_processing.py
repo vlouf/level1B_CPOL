@@ -114,9 +114,8 @@ def production_line_multiproc(mydate):
 
     # Checking if input directory exists.
     if not os.path.exists(indir):
-        logger.error("Input directory %s does not exist.", indir)
+        logger.error("Directory structure not as expected.", indir)
         indir = INPATH
-        # return None
 
     # Checking if output directory exists. Creating them otherwise.
     outdir = os.path.join(OUTPATH, year)
