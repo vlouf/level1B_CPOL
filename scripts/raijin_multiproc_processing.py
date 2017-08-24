@@ -112,11 +112,12 @@ def production_line_multiproc(mydate):
     year = str(mydate.year)
     datestr = mydate.strftime("%Y%m%d")
     indir = os.path.join(INPATH, year, datestr)
+    if not IS_CPOL:
+        indir = INPATH
 
     # Checking if input directory exists.
     if not os.path.exists(indir):
-        logger.error("Directory structure not as expected.", indir)
-        indir = INPATH
+        return None
 
     # Checking if output directory exists. Creating them otherwise.
     outdir = os.path.join(OUTPATH, year)
@@ -190,14 +191,19 @@ if __name__ == '__main__':
     # Input directory for Radiosoundings
     SOUND_DIR = "/g/data2/rr5/vhl548/soudings_netcdf/"
     # Output directory for log files.
-    LOG_FILE_PATH = "/short/kl02/vhl548/logfiles/"
+    LOG_FILE_PATH = os.path.expanduser('~')
     # Time in seconds for which each subprocess is allowed to live.
     TIME_BEFORE_DEATH = 600  # seconds before killing process.
+    # True (or False) it is (or not) CPOL radar:
+    IS_CPOL = True
 
     # Output directory for verification figures.
     FIGURE_CHECK_PATH = os.path.join(OUTPATH, 'FIGURE_CHECK')
     # Output directory for GRIDDED netcdf data.
     OUTPATH_GRID = os.path.join(OUTPATH, 'GRIDDED')
+    # Creating directory for logfiles
+    if "logfiles" not in LOG_FILE_PATH:
+        LOG_FILE_PATH = os.path.join(LOG_FILE_PATH, "logfiles")
 
     # Check if paths exist.
     if not os.path.isdir(OUTPATH):
@@ -267,7 +273,7 @@ if __name__ == '__main__':
         level=logging.DEBUG,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         filename=log_file_name,
-        filemode='a+')
+        filemode='w+')
     logger = logging.getLogger(__name__)
 
     with warnings.catch_warnings():
