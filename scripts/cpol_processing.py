@@ -127,10 +127,10 @@ def plot_figure_check(radar, gatefilter, outfilename, radar_date, figure_path):
         except KeyError:
             pass
 
-        gr.plot_ppi('giangrande_corrected_differential_phase', ax=the_ax[6],
+        gr.plot_ppi('corrected_differential_phase', ax=the_ax[6],
                     gatefilter=gatefilter, vmin=-180, vmax=180,
                     cmap=pyart.config.get_field_colormap('corrected_differential_phase'))
-        gr.plot_ppi('giangrande_specific_differential_phase', ax=the_ax[7],
+        gr.plot_ppi('corrected_specific_differential_phase', ax=the_ax[7],
                     gatefilter=gatefilter, vmin=-5, vmax=10,
                     cmap=pyart.config.get_field_colormap('specific_differential_phase'))
         gr.plot_ppi('radar_estimated_rain_rate', ax=the_ax[8], gatefilter=gatefilter)
@@ -247,11 +247,10 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         fake_ncp = False
     except KeyError:
         # Creating a fake NCP field.
-        tmp = np.zeros_like(radar.fields['DBZ']['data']) + 1
-        ncp_meta = pyart.config.get_metadata('normalized_coherent_power')
-        ncp_meta['data'] = tmp
-        ncp_meta['description'] = "THIS FIELD IS FAKE AND SHOULD BE REMOVED. DO NOT USE IT!"
-        radar.add_field('NCP', ncp_meta)
+        ncp = pyart.config.get_metadata('normalized_coherent_power')
+        ncp['data'] = np.ones_like(radar.fields['DBZ']['data'])
+        ncp['description'] = "THIS FIELD IS FAKE. SHOULD BE REMOVED!"
+        radar.add_field('NCP', ncp)
         fake_ncp = True
 
     # Looking for RHOHV field
@@ -261,15 +260,14 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         fake_rhohv = False  # Don't need to delete this field cause it's legit.
     except KeyError:
         # Creating a fake RHOHV field.
-        tmp = np.zeros_like(radar.fields['DBZ']['data']) + 1
-        rho_meta = pyart.config.get_metadata('cross_correlation_ratio')
-        rho_meta['data'] = tmp
-        rho_meta['description'] = "THIS FIELD IS FAKE. DO NOT USE IT!"
-        radar.add_field('RHOHV', rho_meta)
+        rho = pyart.config.get_metadata('cross_correlation_ratio')
+        rho['data'] = np.ones_like(radar.fields['DBZ']['data'])
+        rho['description'] = "THIS FIELD IS FAKE. SHOULD BE REMOVED!"
+        radar.add_field('RHOHV', rho)
         fake_rhohv = True  # We delete this fake field later.
 
     if fake_rhohv:
-        radar.metadata['debug_info'] = 'RHOHV field does not exist in RAW data. Using fake RHOHV.'
+        radar.metadata['debug_info'] = 'RHOHV field does not exist in RAW data. I had to use a fake RHOHV.'
         logger.critical("RHOHV field not found, creating a fake RHOHV")
 
     # Compute SNR and extract radiosounding temperature.
@@ -290,15 +288,6 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
         radar.add_field('SNR', snr, replace_existing=True)
         logger.info('SNR calculated.')
 
-    # Looking for KDP and estimating it.
-    try:
-        radar.fields['KDP']
-        logger.info('KDP already exists.')
-    except KeyError:
-        kdp = phase_codes.estimate_kdp_sobel(radar)
-        radar.add_field("KDP", kdp, replace_existing=True)
-        logger.info('KDP estimated.')
-
     # Correct RHOHV
     rho_corr = radar_codes.correct_rhohv(radar)
     radar.add_field_like('RHOHV', 'RHOHV_CORR', rho_corr, replace_existing=True)
@@ -313,11 +302,11 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     radar.add_field_like('ZDR', 'ZDR_CORR', corr_zdr, replace_existing=True)
 
     # Giangrande PHIDP/KDP
-    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar, gatefilter, phidp_field='PHIDP', kdp_field='KDP')
+    phidp_gg, kdp_gg = phase_codes.phidp_giangrande(radar)
     radar.add_field('PHIDP_GG', phidp_gg, replace_existing=True)
     radar.add_field('KDP_GG', kdp_gg, replace_existing=True)
-    radar.fields['PHIDP_GG']['long_name'] = "giangrande_differential_phase"
-    radar.fields['KDP_GG']['long_name'] = "giangrande_specific_differential_phase"
+    radar.fields['PHIDP_GG']['long_name'] = "corrected_differential_phase"
+    radar.fields['KDP_GG']['long_name'] = "corrected_specific_differential_phase"
     logger.info('KDP/PHIDP Giangrande estimated.')
 
     # # Refold VELOCITY using unfolded PHIDP
@@ -390,7 +379,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     for mykey in radar.fields:
         if mykey in ['temperature', 'height', 'signal_to_noise_ratio',
                      'normalized_coherent_power', 'spectrum_width', 'total_power',
-                     'giangrande_corrected_differential_phase', 'giangrande_specific_differential_phase']:
+                     'corrected_differential_phase', 'corrected_specific_differential_phase']:
             # Virgin fields that are left untouch.
             continue
         else:
@@ -409,7 +398,7 @@ def production_line(radar_file_name, outpath, outpath_grid, figure_path, sound_d
     logger.info("Gridding started.")
     unwanted_keys = []
     goodkeys = ['corrected_differential_reflectivity', 'cross_correlation_ratio',
-                'temperature', 'giangrande_corrected_differential_phase',
+                'temperature', 'corrected_differential_phase', 'corrected_specific_differential_phase',
                 'radar_echo_classification', 'radar_estimated_rain_rate', 'D0',
                 'NW', 'corrected_reflectivity', 'velocity', 'region_dealias_velocity']
     for mykey in radar.fields.keys():
